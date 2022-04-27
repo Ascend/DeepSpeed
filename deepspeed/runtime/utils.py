@@ -22,14 +22,14 @@ from deepspeed.utils import groups, logger
 from numpy import prod
 
 # pt-1.9 deprecations
-if hasattr(torch.cuda, "memory_reserved"):
-    torch_memory_reserved = torch.cuda.memory_reserved
+if hasattr(torch.npu, "memory_reserved"):
+    torch_memory_reserved = torch.npu.memory_reserved
 else:
-    torch_memory_reserved = torch.cuda.memory_allocated
-if hasattr(torch.cuda, "max_memory_reserved"):
-    torch_max_memory_reserved = torch.cuda.max_memory_reserved
+    torch_memory_reserved = torch.npu.memory_allocated
+if hasattr(torch.npu, "max_memory_reserved"):
+    torch_max_memory_reserved = torch.npu.max_memory_reserved
 else:
-    torch_max_memory_reserved = torch.cuda.memory_cached
+    torch_max_memory_reserved = torch.npu.memory_cached
 
 
 class DummyOptim():
@@ -823,8 +823,8 @@ def see_memory_usage(message, force=False):
     # Print message except when distributed but not rank 0
     logger.info(message)
     logger.info(
-        f"MA {round(torch.cuda.memory_allocated() / (1024 * 1024 * 1024),2 )} GB \
-        Max_MA {round(torch.cuda.max_memory_allocated() / (1024 * 1024 * 1024),2)} GB \
+        f"MA {round(torch.npu.memory_allocated() / (1024 * 1024 * 1024),2 )} GB \
+        Max_MA {round(torch.npu.max_memory_allocated() / (1024 * 1024 * 1024),2)} GB \
         CA {round(torch_memory_reserved() / (1024 * 1024 * 1024),2)} GB \
         Max_CA {round(torch_max_memory_reserved() / (1024 * 1024 * 1024))} GB ")
 
@@ -834,8 +834,8 @@ def see_memory_usage(message, force=False):
         f'CPU Virtual Memory:  used = {used_GB} GB, percent = {vm_stats.percent}%')
 
     # get the peak memory to report correct data, so reset the counter for the next call
-    if hasattr(torch.cuda, "reset_peak_memory_stats"):  # pytorch 1.4+
-        torch.cuda.reset_peak_memory_stats()
+    if hasattr(torch.npu, "reset_peak_memory_stats"):  # pytorch 1.4+
+        torch.npu.reset_peak_memory_stats()
 
 
 def call_to_str(base, *args, **kwargs):

@@ -86,14 +86,14 @@ class SynchronizedWallClockTimer:
 
     @staticmethod
     def memory_usage():
-        alloc = "mem_allocated: {:.4f} GB".format(torch.cuda.memory_allocated() /
+        alloc = "mem_allocated: {:.4f} GB".format(torch.npu.memory_allocated() /
                                                   (1024 * 1024 * 1024))
         max_alloc = "max_mem_allocated: {:.4f} GB".format(
-            torch.cuda.max_memory_allocated() / (1024 * 1024 * 1024))
-        cache = "cache_allocated: {:.4f} GB".format(torch.cuda.memory_cached() /
+            torch.npu.max_memory_allocated() / (1024 * 1024 * 1024))
+        cache = "cache_allocated: {:.4f} GB".format(torch.npu.memory_cached() /
                                                     (1024 * 1024 * 1024))
         max_cache = "max_cache_allocated: {:.4f} GB".format(
-            torch.cuda.max_memory_cached() / (1024 * 1024 * 1024))
+            torch.npu.max_memory_cached() / (1024 * 1024 * 1024))
         return " | {} | {} | {} | {}".format(alloc, max_alloc, cache, max_cache)
 
     def log(self, names, normalizer=1.0, reset=True, memory_breakdown=False, ranks=None):
@@ -162,7 +162,7 @@ class ThroughputTimer:
         self._init_timer()
         self.started = True
         if self.total_step_count >= self.start_step:
-            torch.cuda.synchronize()
+            torch.npu.synchronize()
             self.start_time = time.time()
 
     def stop(self, report_speed=True):
@@ -172,7 +172,7 @@ class ThroughputTimer:
         self.total_step_count += 1
         self.local_step_count += 1
         if self.total_step_count > self.start_step:
-            torch.cuda.synchronize()
+            torch.npu.synchronize()
             self.end_time = time.time()
             duration = self.end_time - self.start_time
             self.total_elapsed_time += duration
@@ -183,9 +183,9 @@ class ThroughputTimer:
                         .format(self.epoch_count,
                                 self.local_step_count,
                                 self.avg_samples_per_sec(),
-                                round(torch.cuda.memory_allocated() / 1024**3,
+                                round(torch.npu.memory_allocated() / 1024**3,
                                       2),
-                                round(torch.cuda.max_memory_allocated() / 1024**3,
+                                round(torch.npu.max_memory_allocated() / 1024**3,
                                       2)))
                 if self.monitor_memory:
                     virt_mem = psutil.virtual_memory()

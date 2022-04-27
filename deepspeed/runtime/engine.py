@@ -829,7 +829,7 @@ class DeepSpeedEngine(Module):
             args,
             'device_rank') else self.local_rank
         if device_rank >= 0:
-            torch.cuda.set_device(device_rank)
+            torch.npu.set_device(device_rank)
             self.device = torch.device("cuda", device_rank)
             self.world_size = dist.get_world_size()
             self.global_rank = dist.get_rank()
@@ -986,6 +986,9 @@ class DeepSpeedEngine(Module):
             self.__check_params(self.module, torch.float)
 
         if not self.dont_change_device:
+            print("self.device", self.device)
+            self.device = "npu:0"
+            print("self.device", self.device)
             self.module.to(self.device)
 
         # MoE related initialization
@@ -1148,12 +1151,11 @@ class DeepSpeedEngine(Module):
                                                      **optimizer_parameters,
                                                      adamw_mode=effective_adam_w_mode)
                 else:
-                    from deepspeed.ops.adam import FusedAdam
+                    # from deepspeed.ops.adam import FusedAdam
 
-                    optimizer = FusedAdam(
+                    optimizer = torch.optim.Adam(
                         model_parameters,
                         **optimizer_parameters,
-                        adam_w_mode=effective_adam_w_mode,
                     )
 
         elif self.optimizer_name() == LAMB_OPTIMIZER:

@@ -256,7 +256,7 @@ def free_param(param: Parameter) -> None:
     if param.data.is_cuda:
         # need to make sure that we don't free the parameter while it is still
         # being used for computation
-        param.data.record_stream(torch.cuda.current_stream())
+        param.data.record_stream(torch.npu.current_stream())
     # param.data doesn't store anything meaningful in partitioned state
     param.data = torch.empty(0, dtype=param.dtype, device=param.device)
     param.ds_status = ZeroParamStatus.NOT_AVAILABLE
@@ -537,7 +537,7 @@ class AllGatherCoalescedHandle:
             param.ds_status = ZeroParamStatus.AVAILABLE
 
             for part_to_copy in partitions:
-                part_to_copy.record_stream(torch.cuda.current_stream())
+                part_to_copy.record_stream(torch.npu.current_stream())
 
             param_offset += param.ds_tensor.ds_numel
 
@@ -682,8 +682,8 @@ class Init(InsertPostInitMethodToModuleSubClasses):
 
         # Local device is the device where the parameters are consumed, must be default device.
         # It is the device where parameters are fully instantiated using allgather
-        self.local_device = torch.device('cuda:{}'.format(os.environ["LOCAL_RANK"]))
-        torch.cuda.set_device(self.local_device)
+        self.local_device = torch.device('npu:{}'.format(os.environ["LOCAL_RANK"]))
+        torch.npu.set_device(self.local_device)
 
         if _ds_config is not None and _ds_config.zero_config.offload_param is not None:
             remote_device = _ds_config.zero_config.offload_param[OFFLOAD_PARAM_DEVICE]
@@ -847,11 +847,11 @@ class Init(InsertPostInitMethodToModuleSubClasses):
                 param_buffer = torch.empty(
                     math.ceil(param.ds_numel / self.world_size) * self.world_size,
                     dtype=param.dtype,
-                    device=torch.cuda.current_device(),
+                    device=torch.npu.current_device(),
                     requires_grad=False,
                 )
                 handle = torch_allgather_fn(
-                    param.ds_tensor.to(torch.cuda.current_device()),
+                    param.ds_tensor.to(torch.npu.current_device()),
                     param_buffer,
                     self.ds_process_group,
                 )
@@ -865,7 +865,7 @@ class Init(InsertPostInitMethodToModuleSubClasses):
                 flat_tensor = torch.empty(partition_sz * self.world_size,
                                           dtype=get_only_unique_item(p.dtype
                                                                      for p in params),
-                                          device=torch.cuda.current_device(),
+                                          device=torch.npu.current_device(),
                                           requires_grad=False)
                 partitions: List[Parameter] = []
                 for i in range(self.world_size):
@@ -875,7 +875,7 @@ class Init(InsertPostInitMethodToModuleSubClasses):
                                            partition_sz))
 
                 instrument_w_nvtx(torch.cat)(
-                    [p.ds_tensor.to(torch.cuda.current_device()) for p in params],
+                    [p.ds_tensor.to(torch.npu.current_device()) for p in params],
                     out=partitions[self.rank])
 
                 handle = torch_allgather_fn(partitions[self.rank],
@@ -1253,7 +1253,7 @@ class Init(InsertPostInitMethodToModuleSubClasses):
         local_tensors = []
         for param in param_list:
             partition_sizes.append(param.ds_tensor.ds_numel)
-            local_tensors.append(param.ds_tensor.cuda())
+            local_tensors.append(param.ds_tensor.npu())
 
         # allocate memory for allgather params
         allgather_params = []
@@ -1307,7 +1307,7 @@ class Init(InsertPostInitMethodToModuleSubClasses):
                                                 param.ds_numel).view(param.ds_shape).data
 
         # guarantee the communication to be completed
-        torch.cuda.synchronize()
+        torch.npu.synchronize()
 
         return None
 
