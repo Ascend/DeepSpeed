@@ -959,7 +959,7 @@ class DeepSpeedZeroOptimizer(object):
                 #     print(f"Rank {dist.get_rank()} rank offset id {i} real dp size {dist.get_world_size(group=real_dp_process_group[i])} and dst: {dst}")
                 # dist.barrier()
                 #dist.barrier()
-                dst_rank = _get_global_rank(real_dp_process_group[i], dst)
+                # dst_rank = _get_global_rank(real_dp_process_group[i], dst)
                 #async_handle = dist.reduce(grad_slice,
                 #                           dst=dst_rank,
                 #                           group=real_dp_process_group[i],

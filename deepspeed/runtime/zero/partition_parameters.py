@@ -536,8 +536,10 @@ class AllGatherCoalescedHandle:
             param.data = instrument_w_nvtx(torch.cat)(partitions).view(param.ds_shape)
             param.ds_status = ZeroParamStatus.AVAILABLE
 
-            for part_to_copy in partitions:
-                part_to_copy.record_stream(torch.npu.current_stream())
+            # TODO: fix record_stream api
+            print("TODO: fix record_stream api")
+            # for part_to_copy in partitions:
+            #     part_to_copy.record_stream(torch.npu.current_stream())
 
             param_offset += param.ds_tensor.ds_numel
 
@@ -1284,9 +1286,9 @@ class Init(InsertPostInitMethodToModuleSubClasses):
                     psize = partition_sizes[param_idx]
                     partition = allgather_params[param_idx].narrow(0, i * psize, psize)
                     output_list.append(partition)
-                    if not partition.is_cuda:
+                    if not partition.is_cuda and not partition.is_npu:
                         logger.warning(
-                            f'param {param_idx}, partition {i} is not on CUDA, partition shape {partition.size()}'
+                            f'param {param_idx}, partition {i} is not on CUDA or NPU, partition shape {partition.size()}'
                         )
 
                 # back to old all_gather function signature

@@ -3,6 +3,8 @@ from typing import Dict, List, Set
 import pytest
 import torch.distributed as dist
 import torch
+if "1.5.0" not in torch.__version__:
+    import torch_npu
 from torch import Tensor
 from torch.nn import Linear, Module
 from torch.nn.modules.container import ModuleList
@@ -68,7 +70,7 @@ def test_zero_unbalanced_gradients(tmpdir, zero_stage):
 
     model = SimpleModel(hidden_dim=hidden_dim)
 
-    @distributed_test(world_size=[1])
+    @distributed_test(world_size=[2])
     def _test_zero_unbalanced_gradients(model, hidden_dim):
         model, _, _, _ = deepspeed.initialize(config=config_dict,
                                               model=model,

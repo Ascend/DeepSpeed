@@ -9,7 +9,7 @@ from .logging import logger
 from ..constants import TORCH_DISTRIBUTED_DEFAULT_PORT, default_pg_timeout
 
 
-def init_distributed(dist_backend="nccl",
+def init_distributed(dist_backend="hccl",
                      auto_mpi_discovery=True,
                      distributed_port=TORCH_DISTRIBUTED_DEFAULT_PORT,
                      verbose=True,

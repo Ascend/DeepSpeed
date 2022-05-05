@@ -830,13 +830,13 @@ class DeepSpeedEngine(Module):
             'device_rank') else self.local_rank
         if device_rank >= 0:
             torch.npu.set_device(device_rank)
-            self.device = torch.device("cuda", device_rank)
+            self.device = torch.device("npu", device_rank)
             self.world_size = dist.get_world_size()
             self.global_rank = dist.get_rank()
         else:
             self.world_size = 1
             self.global_rank = 0
-            self.device = torch.device("cuda")
+            self.device = torch.device("npu")
 
     # Configure based on command line arguments
     def _configure_with_arguments(self, args, mpu):
@@ -986,9 +986,6 @@ class DeepSpeedEngine(Module):
             self.__check_params(self.module, torch.float)
 
         if not self.dont_change_device:
-            print("self.device", self.device)
-            self.device = "npu:0"
-            print("self.device", self.device)
             self.module.to(self.device)
 
         # MoE related initialization
@@ -2669,8 +2666,9 @@ class DeepSpeedEngine(Module):
             bhash = torch.ByteTensor([s_hash.digest()]).flatten().to(self.device)
             max_bhash = bhash.clone()
             min_bhash = bhash.clone()
-            dist.all_reduce(max_bhash, op=torch.distributed.ReduceOp.MAX)
-            dist.all_reduce(min_bhash, op=torch.distributed.ReduceOp.MIN)
+            # TODO: hccl does not support uint8
+            #dist.all_reduce(max_bhash, op=torch.distributed.ReduceOp.MAX)
+            #dist.all_reduce(min_bhash, op=torch.distributed.ReduceOp.MIN)
             valid = all(min_bhash == bhash) and all(max_bhash == bhash)
             msg = (
                 f"[rank={dist.get_rank()}] The checkpoint tag name '{tag}' is not consistent across "

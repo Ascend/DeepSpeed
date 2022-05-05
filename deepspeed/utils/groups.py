@@ -290,6 +290,9 @@ def _get_data_parallel_group():
 
 
 def _get_broadcast_src_rank():
+    # TODO: fix _get_global_rank api in pytorch1.8.1
+    print("TODO: fix _get_global_rank api in pytorch1.8.1")
+    return 0
     return _get_global_rank(_get_data_parallel_group(), 0)
 
 
