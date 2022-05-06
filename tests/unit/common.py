@@ -98,8 +98,8 @@ def distributed_test(world_size=2, backend='hccl'):
 
             deepspeed.init_distributed(dist_backend=backend)
 
-            if torch.cuda.is_available():
-                torch.cuda.set_device(local_rank)
+            if torch.npu.is_available():
+                torch.npu.set_device(local_rank)
 
             run_func(*func_args, **func_kwargs)
 

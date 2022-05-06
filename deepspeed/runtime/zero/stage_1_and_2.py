@@ -802,8 +802,12 @@ class DeepSpeedZeroOptimizer(object):
             padded_tensor_list = tensor_list + [pad_tensor]
         else:
             padded_tensor_list = tensor_list
+        # TODO：1.8.1 does not support this api now
+        print("1.8.1 not support torch::utils::flatten_dense_tensors")
+        for i in range(len(padded_tensor_list)):
+            padded_tensor_list[i] = padded_tensor_list[i].cpu()
 
-        return self.flatten(padded_tensor_list)
+        return self.flatten(padded_tensor_list).npu()
 
     ############### Independent Partition Gradient ########################
     def reduce_independent_p_g_buckets_and_remove_grads(self, param, i):
