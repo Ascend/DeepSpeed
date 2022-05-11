@@ -867,8 +867,7 @@ class Init(InsertPostInitMethodToModuleSubClasses):
                 flat_tensor = torch.empty(partition_sz * self.world_size,
                                           dtype=get_only_unique_item(p.dtype
                                                                      for p in params),
-                                          device=torch.npu.current_device(),
-                                          requires_grad=False)
+                                          requires_grad=False).to("npu:{}".format(torch.npu.current_device()))
                 partitions: List[Parameter] = []
                 for i in range(self.world_size):
                     partitions.append(

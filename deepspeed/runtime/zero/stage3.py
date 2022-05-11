@@ -638,8 +638,7 @@ class DeepSpeedZeroOptimizer_Stage3(object):
         self.__inf_or_nan_tracker: Tensor = torch.zeros(
             1,
             dtype=torch.bool,
-            device=torch.npu.current_device(),
-            requires_grad=False)
+            requires_grad=False).to("npu:{}".format(torch.npu.current_device()))
 
         self.deepspeed_adam_offload = (self.offload_optimizer
                                        and type(init_optimizer) == DeepSpeedCPUAdam)
@@ -778,8 +777,7 @@ class DeepSpeedZeroOptimizer_Stage3(object):
         if contiguous_gradients:
             self.__ipg_bucket_flat_buffer: Tensor = torch.empty(
                 int(reduce_bucket_size),
-                dtype=self.dtype,
-                device=torch.npu.current_device())
+                dtype=self.dtype).to("npu:{}".format(torch.npu.current_device()))
 
         self.__param_id_to_grad_partition: Dict[int, Tensor] = {}
 
@@ -788,8 +786,8 @@ class DeepSpeedZeroOptimizer_Stage3(object):
         grad_partitions_flat_buffer: Tensor = torch.zeros(
             sum(p.ds_tensor.ds_numel for p in all_params),
             dtype=self.dtype,
-            device=self.device,
-            pin_memory=self.offload_optimizer_pin_memory)
+            pin_memory=self.offload_optimizer_pin_memory).\
+            to("npu:{}".format(self.device))
 
         offset = 0
         for param in all_params:
@@ -1612,8 +1610,7 @@ class DeepSpeedZeroOptimizer_Stage3(object):
             [sum([p.ds_numel for p in psg]) for psg in self.fp16_partitioned_groups])
         gradient_dtype = self.fp32_partitioned_groups_flat[0].dtype
         gradient_buffer = torch.zeros(int(largest_numel),
-                                      dtype=gradient_dtype,
-                                      device=self.device)
+                                      dtype=gradient_dtype).to("npu:{}".format(self.device))
 
         timers = self.timers
         timer_names = set()

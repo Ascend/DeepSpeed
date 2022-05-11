@@ -143,7 +143,12 @@ class DeepSpeedZeroOptimizer(object):
 
         # Load pre-built or JIT compile (un)flatten ops
         util_ops = UtilsBuilder().load()
-        self.flatten = util_ops.flatten
+        def flatten_tmp(lst):
+            for i in range(len(lst)):
+                lst[i] = lst[i].cpu()
+            return util_ops.flatten(lst).npu()
+        # self.flatten = util_ops.flatten
+        self.flatten = flatten_tmp
         self.unflatten = util_ops.unflatten
 
         # ZeRO stage 1 (False) or 2 (True)
@@ -563,12 +568,15 @@ class DeepSpeedZeroOptimizer(object):
             self.grads_in_partition_offset = 0
 
     def initialize_optimizer_states(self):
-
+        print("TODO:", " torch.ones([2,3], device=1) not support")
         for i, group in enumerate(self.bit16_groups):
+            # single_grad_partition = torch.zeros(
+            #     int(self.partition_size[i]),
+            #     dtype=self.single_partition_of_fp32_groups[i].dtype,
+            #     device=self.device)
             single_grad_partition = torch.zeros(
                 int(self.partition_size[i]),
-                dtype=self.single_partition_of_fp32_groups[i].dtype,
-                device=self.device)
+                dtype=self.single_partition_of_fp32_groups[i].dtype).to("npu:{}".format(self.device))
             self.single_partition_of_fp32_groups[
                 i].grad = single_grad_partition.pin_memory(
                 ) if self.cpu_offload else single_grad_partition
@@ -802,12 +810,8 @@ class DeepSpeedZeroOptimizer(object):
             padded_tensor_list = tensor_list + [pad_tensor]
         else:
             padded_tensor_list = tensor_list
-        # TODO：1.8.1 does not support this api now
-        print("1.8.1 not support torch::utils::flatten_dense_tensors")
-        for i in range(len(padded_tensor_list)):
-            padded_tensor_list[i] = padded_tensor_list[i].cpu()
 
-        return self.flatten(padded_tensor_list).npu()
+        return self.flatten(padded_tensor_list)
 
     ############### Independent Partition Gradient ########################
     def reduce_independent_p_g_buckets_and_remove_grads(self, param, i):
@@ -963,11 +967,16 @@ class DeepSpeedZeroOptimizer(object):
                 #     print(f"Rank {dist.get_rank()} rank offset id {i} real dp size {dist.get_world_size(group=real_dp_process_group[i])} and dst: {dst}")
                 # dist.barrier()
                 #dist.barrier()
-                # dst_rank = _get_global_rank(real_dp_process_group[i], dst)
-                #async_handle = dist.reduce(grad_slice,
-                #                           dst=dst_rank,
-                #                           group=real_dp_process_group[i],
-                #                           async_op=True)
+
+                dst_rank = _get_global_rank(real_dp_process_group[i], dst)
+                # async_handle = dist.reduce(grad_slice,
+                #                            dst=dst_rank,
+                #                            group=real_dp_process_group[i],
+                #                            async_op=True)
+                async_handle = dist.reduce(grad_slice,
+                                           dst=dst_rank,
+                                           group=real_dp_process_group[i],
+                                           async_op=False)
                 #async_handles.append(async_handle)
 
             #for handle in async_handles:
@@ -1184,8 +1193,7 @@ class DeepSpeedZeroOptimizer(object):
 
             see_memory_usage(f"before copying {total_size} gradients into partition")
             self.grads_in_partition = torch.empty(int(total_size),
-                                                  dtype=self.dtype,
-                                                  device=torch.npu.current_device())
+                                                  dtype=self.dtype).to("npu:{}".format(torch.npu.current_device()))
             see_memory_usage(f"after copying {total_size} gradients into partition")
 
         # The allreduce buffer will be rewritten. Copy the gradients in partition to a new buffer
@@ -1903,12 +1911,14 @@ class DeepSpeedZeroOptimizer(object):
         3. scaled_loss.backward(), which accumulates scaled gradients into the ``.grad`` attributes of the model's fp16 leaves
         """
         self.micro_step_id += 1
-
+        print("TODO:", " torch.ones([2,3], device=1) not support")
         if self.contiguous_gradients:
             self.ipg_buffer = []
+            # buf_0 = torch.empty(int(self.reduce_bucket_size),
+            #                     dtype=self.dtype,
+            #                     device=torch.npu.current_device())
             buf_0 = torch.empty(int(self.reduce_bucket_size),
-                                dtype=self.dtype,
-                                device=torch.npu.current_device())
+                                dtype=self.dtype).to("npu:{}".format(torch.npu.current_device()))
             self.ipg_buffer.append(buf_0)
 
             # Use double buffers to avoid data access conflict when overlap_comm is enabled.
