@@ -1605,8 +1605,7 @@ class DeepSpeedZeroOptimizer(object):
         if current_size < partition_size:
             flat_tensor_list.append(
                 torch.zeros(int(partition_size - current_size),
-                            dtype=dtype,
-                            device=device))
+                            dtype=dtype).to("npu:{}".format(device)))
 
         if return_tensor_list:
             return flat_tensor_list
