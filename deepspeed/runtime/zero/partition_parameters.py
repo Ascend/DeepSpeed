@@ -536,10 +536,8 @@ class AllGatherCoalescedHandle:
             param.data = instrument_w_nvtx(torch.cat)(partitions).view(param.ds_shape)
             param.ds_status = ZeroParamStatus.AVAILABLE
 
-            # TODO: fix record_stream api
-            print("TODO: fix record_stream api")
-            # for part_to_copy in partitions:
-            #     part_to_copy.record_stream(torch.npu.current_stream())
+            for part_to_copy in partitions:
+                part_to_copy.record_stream(torch.npu.current_stream())
 
             param_offset += param.ds_tensor.ds_numel
 

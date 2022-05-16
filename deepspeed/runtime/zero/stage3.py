@@ -1829,7 +1829,7 @@ class DeepSpeedZeroOptimizer_Stage3(object):
                     self.elements_in_ipg_bucket,
                     param.grad.numel()).view_as(param.grad)
                 new_grad_tensor.copy_(param.grad, non_blocking=True)
-                # param.grad.record_stream(torch.npu.current_stream())
+                param.grad.record_stream(torch.npu.current_stream())
                 param.grad.data = new_grad_tensor
 
         self.__params_in_ipg_bucket.append(param)
@@ -2031,7 +2031,7 @@ class DeepSpeedZeroOptimizer_Stage3(object):
                         fp32_grad_tensor.copy_(grad_buffer)
 
             # free the gradient
-            # param.grad.record_stream(torch.npu.current_stream())
+            param.grad.record_stream(torch.npu.current_stream())
             param.grad = None
 
         if self.offload_optimizer and self.swap_optimizer:
