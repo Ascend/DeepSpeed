@@ -2666,9 +2666,15 @@ class DeepSpeedEngine(Module):
             bhash = torch.ByteTensor([s_hash.digest()]).flatten().to(self.device)
             max_bhash = bhash.clone()
             min_bhash = bhash.clone()
-            # TODO: hccl does not support uint8
-            #dist.all_reduce(max_bhash, op=torch.distributed.ReduceOp.MAX)
-            #dist.all_reduce(min_bhash, op=torch.distributed.ReduceOp.MIN)
+
+            max_bhash = max_bhash.int()
+            min_bhash = min_bhash.int()
+            dist.all_reduce(max_bhash, op=torch.distributed.ReduceOp.MAX)
+            dist.all_reduce(min_bhash, op=torch.distributed.ReduceOp.MIN)
+
+            max_bhash = max_bhash.byte()
+            min_bhash = min_bhash.byte()
+
             valid = all(min_bhash == bhash) and all(max_bhash == bhash)
             msg = (
                 f"[rank={dist.get_rank()}] The checkpoint tag name '{tag}' is not consistent across "

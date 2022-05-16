@@ -847,9 +847,8 @@ class Init(InsertPostInitMethodToModuleSubClasses):
                 param_buffer = torch.empty(
                     math.ceil(param.ds_numel / self.world_size) * self.world_size,
                     dtype=param.dtype,
-                    device=torch.npu.current_device(),
                     requires_grad=False,
-                )
+                ).to("npu:{}".format(torch.npu.current_device()))
                 handle = torch_allgather_fn(
                     param.ds_tensor.to(torch.npu.current_device()),
                     param_buffer,
