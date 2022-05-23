@@ -35,7 +35,8 @@ def get_master_port():
 
 
 def set_cuda_visibile():
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
+    # ASCEND AVOID
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3,4,5,6,7"
     cuda_visible = os.environ.get("CUDA_VISIBLE_DEVICES", None)
     xdist_worker_id = get_xdist_worker_id()
     if xdist_worker_id is None:

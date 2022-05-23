@@ -57,7 +57,9 @@ def test_zero_unbalanced_gradients(tmpdir, zero_stage):
         "optimizer": {
             "type": "Adam",
             "params": {
-                "lr": 1e-3
+                "lr": 1e-3,
+                # ASCEND AVOID
+                "torch_adam": True,
             }
         },
         "fp16": {

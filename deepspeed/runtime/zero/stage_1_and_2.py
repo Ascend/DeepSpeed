@@ -143,6 +143,7 @@ class DeepSpeedZeroOptimizer(object):
 
         # Load pre-built or JIT compile (un)flatten ops
         util_ops = UtilsBuilder().load()
+        # ASCEND AVOID
         def flatten_tmp(lst):
             for i in range(len(lst)):
                 lst[i] = lst[i].cpu()
@@ -973,6 +974,7 @@ class DeepSpeedZeroOptimizer(object):
                 #                            dst=dst_rank,
                 #                            group=real_dp_process_group[i],
                 #                            async_op=True)
+                # ASCEND AVOID
                 async_handle = dist.reduce(grad_slice,
                                            dst=dst_rank,
                                            group=real_dp_process_group[i],

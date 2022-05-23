@@ -29,6 +29,7 @@ else:
         input_tensor_lst = list(
             torch.chunk(input_tensor,
                         torch.distributed.get_world_size(group)))
+        # ASCEND AVOID
         for i in range(len(input_tensor_lst)):
             input_tensor_lst[i] = input_tensor_lst[i].clone()
         output_tensor = output_tensor.clone()

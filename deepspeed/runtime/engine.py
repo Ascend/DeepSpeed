@@ -1148,11 +1148,12 @@ class DeepSpeedEngine(Module):
                                                      **optimizer_parameters,
                                                      adamw_mode=effective_adam_w_mode)
                 else:
-                    # from deepspeed.ops.adam import FusedAdam
+                    from deepspeed.ops.adam import FusedAdam
 
-                    optimizer = torch.optim.Adam(
+                    optimizer = FusedAdam(
                         model_parameters,
                         **optimizer_parameters,
+                        adam_w_mode=effective_adam_w_mode,
                     )
 
         elif self.optimizer_name() == LAMB_OPTIMIZER:
@@ -2667,6 +2668,7 @@ class DeepSpeedEngine(Module):
             max_bhash = bhash.clone()
             min_bhash = bhash.clone()
 
+            # ASCEND AVOID
             max_bhash = max_bhash.int()
             min_bhash = min_bhash.int()
             dist.all_reduce(max_bhash, op=torch.distributed.ReduceOp.MAX)
