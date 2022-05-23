@@ -218,7 +218,9 @@ def _get_fp32_state_dict_from_zero2_checkpoint(world_size,
         offset = 0
         avail_numel = full_single_fp32_vector.numel()
         for name, shape in shapes.items():
-
+            # ASCEND AVOID
+            shape = torch.Size(shape)
+            shapes[name] = shape
             unpartitioned_numel = shape.numel()
             total_numel += unpartitioned_numel
             total_params += 1
@@ -306,7 +308,9 @@ def _get_fp32_state_dict_from_zero3_checkpoint(world_size,
     total_numel = 0
     total_params = 0
     for name, shape in param_shapes.items():
-
+        # ASCEND AVOID
+        shape = torch.Size(shape)
+        param_shapes[name] = shape
         unpartitioned_numel = shape.numel()
         total_numel += unpartitioned_numel
         total_params += 1

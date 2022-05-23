@@ -14,7 +14,6 @@ from deepspeed.utils import instrument_w_nvtx
 from deepspeed.utils.logging import logger
 
 if hasattr(torch.distributed, "_reduce_scatter_base"):
-
     def torch_reduce_scatter_fn(input_tensor: Tensor, output_tensor: Tensor, group):
         instrument_w_nvtx(torch.distributed._reduce_scatter_base)(
             output_tensor,
@@ -26,11 +25,14 @@ else:
         "unable to find torch.distributed._reduce_scatter_base. will fall back to "
         "torch.distributed.reduce_scatter which will result in suboptimal performance. "
         "please consider upgrading your pytorch installation.")
-
     def torch_reduce_scatter_fn(input_tensor: Tensor, output_tensor: Tensor, group):
         input_tensor_lst = list(
             torch.chunk(input_tensor,
                         torch.distributed.get_world_size(group)))
+        # ASCEND AVOID
+        for i in range(len(input_tensor_lst)):
+            input_tensor_lst[i] = input_tensor_lst[i].clone()
+        output_tensor = output_tensor.clone()
         instrument_w_nvtx(torch.distributed.reduce_scatter)(
             output_tensor,
             input_tensor_lst,

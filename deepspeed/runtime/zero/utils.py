@@ -60,7 +60,7 @@ def get_lst_from_rank0(lst: List[int]) -> None:
         lst if dist.get_rank() == 0 else [-1] * len(lst),
         dtype=int,
         # device=torch.cuda.current_device(),
-        device=torch.device('cuda:{}'.format(os.environ["LOCAL_RANK"])),
+        device=torch.device('npu:{}'.format(os.environ["LOCAL_RANK"])),
         requires_grad=False,
     )
     dist.broadcast(lst_tensor, src=0, async_op=False)

@@ -35,6 +35,8 @@ def get_master_port():
 
 
 def set_cuda_visibile():
+    # ASCEND AVOID
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3,4,5,6,7"
     cuda_visible = os.environ.get("CUDA_VISIBLE_DEVICES", None)
     xdist_worker_id = get_xdist_worker_id()
     if xdist_worker_id is None:
@@ -63,7 +65,7 @@ def set_cuda_visibile():
     os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(dev_id_list)
 
 
-def distributed_test(world_size=2, backend='nccl'):
+def distributed_test(world_size=2, backend='hccl'):
     """A decorator for executing a function (e.g., a unit test) in a distributed manner.
     This decorator manages the spawning and joining of processes, initialization of
     torch.distributed, and catching of errors.
@@ -97,8 +99,8 @@ def distributed_test(world_size=2, backend='nccl'):
 
             deepspeed.init_distributed(dist_backend=backend)
 
-            if torch.cuda.is_available():
-                torch.cuda.set_device(local_rank)
+            if torch.npu.is_available():
+                torch.npu.set_device(local_rank)
 
             run_func(*func_args, **func_kwargs)
 
