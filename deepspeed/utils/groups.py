@@ -24,7 +24,7 @@ Copyright 2021 The Microsoft DeepSpeed Team
  For inference and other new scenarios, the code will be either reused or added to this file.
 """
 
-import torch
+import torch, torch_npu
 from torch.distributed.distributed_c10d import _get_global_rank
 from deepspeed.utils import logger, log_dist
 from deepspeed.utils.exceptions import DeprecatedException

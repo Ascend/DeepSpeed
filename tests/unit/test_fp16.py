@@ -1,6 +1,6 @@
 import math
 from deepspeed.utils import groups
-import torch
+import torch, torch_npu
 import torch.distributed as dist
 import deepspeed
 import argparse
@@ -215,7 +215,7 @@ def test_unfused_fp16_optimizer_gradnorm_for_moe(tmpdir, monkeypatch):
     hidden_dim = 10
 
     def mock_unscale_and_clip_grads(total_norm, apply_scale=True):
-        torch_norm_tensor = torch.cuda.FloatTensor([total_norm])
+        torch_norm_tensor = torch.npu.FloatTensor([total_norm])
         all_gather_results = [
             torch.zeros_like(torch_norm_tensor) for _ in range(dist.get_world_size())
         ]
@@ -262,7 +262,7 @@ def test_fused_fp16_optimizer_gradnorm_for_moe(tmpdir, monkeypatch):
     hidden_dim = 10
 
     def mock_unscale_and_clip_grads(grads_groups_flat, total_norm, apply_scale=True):
-        torch_norm_tensor = torch.cuda.FloatTensor([total_norm])
+        torch_norm_tensor = torch.npu.FloatTensor([total_norm])
         all_gather_results = [
             torch.zeros_like(torch_norm_tensor) for _ in range(dist.get_world_size())
         ]
@@ -275,7 +275,8 @@ def test_fused_fp16_optimizer_gradnorm_for_moe(tmpdir, monkeypatch):
         # initialize MoE
         model = SimpleMoEModel(hidden_dim, ep_size=2)
         # optimizer = torch.optim.AdamW(params=model.parameters())
-        optimizer = FusedAdam(params=model.parameters())
+        # ASCEND AVOID OPT
+        optimizer = torch.optim.Adam(params=model.parameters())
         engine, optimizer, _, _ = deepspeed.initialize(args=args,
                                               model=model,
                                               optimizer=optimizer,
@@ -317,7 +318,7 @@ def test_lamb_optimizer_gradnorm_for_moe(tmpdir, monkeypatch, fused_lamb_legacy:
     hidden_dim = 10
 
     def mock_unscale_and_clip_grads(total_norm, apply_scale=True):
-        torch_norm_tensor = torch.cuda.FloatTensor([total_norm])
+        torch_norm_tensor = torch.npu.FloatTensor([total_norm])
         all_gather_results = [
             torch.zeros_like(torch_norm_tensor) for _ in range(dist.get_world_size())
         ]
@@ -672,7 +673,7 @@ def test_zero_empty_partition(tmpdir, zero_stage, use_cpu_offload):
     }
     args = args_from_dict(tmpdir, config_dict)
 
-    @distributed_test(world_size=[3])
+    @distributed_test(world_size=[2])
     def _test_zero_empty_partition(args, zero_stage):
         hidden_dim = 1
         model = SimpleModel(hidden_dim)
@@ -850,6 +851,10 @@ def test_adam_amp_o2_empty_grad(tmpdir):
                           (3,
                            FusedAdam)])
 def test_zero_supported_client_optimizer(tmpdir, zero_stage, optimizer_constructor):
+    # ASCEND AVOID OPT
+    if optimizer_constructor == FusedAdam:
+        pytest.skip("FusedAdam is not supported")
+
     config_dict = {
         "train_batch_size": 2,
         "steps_per_print": 1,

@@ -11,7 +11,7 @@ import collections
 from collections import OrderedDict, UserDict
 import itertools
 from typing import Deque, Dict, Iterable, Set, Tuple
-import torch
+import torch, torch_npu
 from torch.npu import Event, Stream
 from torch.nn import Module, Parameter
 import torch.distributed as dist
@@ -226,11 +226,11 @@ class PartitionedParameterCoordinator:
 
         # limit the number of fetch events that can be queued at once
         # otherwise, what happens is memory is allocated by the host thread at the
-        # time of the call, but not used until later by the asynchronous cuda stream.
+        # time of the call, but not used until later by the asynchronous npu stream.
         # allowing an infinite number of these to queue up causes a lot of memory
         # pressure that then becomes detrimental to performance.
         # this is a much less elegant way of fixing this vs something like using
-        # cudaMallocAsync/cudaFreeAsync. Choosing to not expose this to the user now
+        # npuMallocAsync/npuFreeAsync. Choosing to not expose this to the user now
         # because ideally in the future its replaced by an async allocation
         # mechanism which doesn't require any configuration by the user.
         self.__ongoing_fetch_events: Deque[Event] = collections.deque()
@@ -599,8 +599,8 @@ class DeepSpeedZeroOptimizer_Stage3(object):
         # - assume all params requires grad
         # - flat by groups, not keeping state. TODO: remove state explicitly?
         # - master grad and unflat master weight never exist. TODO: a way to save out unflat master?
-        if not torch.cuda.is_available:
-            raise SystemError("Cannot use fp16 without CUDA.")
+        if not torch.npu.is_available:
+            raise SystemError("Cannot use fp16 without NPU.")
         self.optimizer = init_optimizer
 
         # Load pre-built or JIT compile (un)flatten ops
@@ -638,7 +638,7 @@ class DeepSpeedZeroOptimizer_Stage3(object):
         self.__inf_or_nan_tracker: Tensor = torch.zeros(
             1,
             dtype=torch.bool,
-            requires_grad=False).to("npu:{}".format(torch.npu.current_device()))
+            requires_grad=False).to(torch.npu.current_device())
 
         self.deepspeed_adam_offload = (self.offload_optimizer
                                        and type(init_optimizer) == DeepSpeedCPUAdam)
@@ -777,7 +777,7 @@ class DeepSpeedZeroOptimizer_Stage3(object):
         if contiguous_gradients:
             self.__ipg_bucket_flat_buffer: Tensor = torch.empty(
                 int(reduce_bucket_size),
-                dtype=self.dtype).to("npu:{}".format(torch.npu.current_device()))
+                dtype=self.dtype).to(torch.npu.current_device())
 
         self.__param_id_to_grad_partition: Dict[int, Tensor] = {}
 
@@ -787,7 +787,7 @@ class DeepSpeedZeroOptimizer_Stage3(object):
             sum(p.ds_tensor.ds_numel for p in all_params),
             dtype=self.dtype,
             pin_memory=self.offload_optimizer_pin_memory).\
-            to("npu:{}".format(self.device))
+            to(self.device)
 
         offset = 0
         for param in all_params:
@@ -921,7 +921,7 @@ class DeepSpeedZeroOptimizer_Stage3(object):
             offset += tensor_numel
 
         gc.collect()
-        torch.cuda.empty_cache()
+        torch.npu.empty_cache()
 
         # copy tensors (now flattened and contiguous) back to GPU
         device_buffer = cpu_buffer.to(orig_device)
@@ -1610,7 +1610,7 @@ class DeepSpeedZeroOptimizer_Stage3(object):
             [sum([p.ds_numel for p in psg]) for psg in self.fp16_partitioned_groups])
         gradient_dtype = self.fp32_partitioned_groups_flat[0].dtype
         gradient_buffer = torch.zeros(int(largest_numel),
-                                      dtype=gradient_dtype).to("npu:{}".format(self.device))
+                                      dtype=gradient_dtype).to(self.device)
 
         timers = self.timers
         timer_names = set()
@@ -1947,16 +1947,18 @@ class DeepSpeedZeroOptimizer_Stage3(object):
                     total_norm += param_norm.item()**2
 
         # Sum across all model parallel GPUs.
-        total_norm_cuda = torch.npu.FloatTensor([float(total_norm)])
+        total_norm_npu = torch.npu.FloatTensor([float(total_norm)])
+        if torch._amp_foreach_non_finite_check_([total_norm_npu]):
+            total_norm_npu = torch.npu.FloatTensor([float('inf')])
 
-        torch.distributed.all_reduce(total_norm_cuda,
+        torch.distributed.all_reduce(total_norm_npu,
                                      op=torch.distributed.ReduceOp.SUM,
                                      group=self.dp_process_group)
 
-        self._model_parallel_all_reduce(tensor=total_norm_cuda,
+        self._model_parallel_all_reduce(tensor=total_norm_npu,
                                         op=torch.distributed.ReduceOp.SUM)
 
-        total_norm = total_norm_cuda[0].item()**(1. / norm_type)
+        total_norm = total_norm_npu[0].item()**(1. / norm_type)
 
         if total_norm == float(
                 'inf') or total_norm == -float('inf') or total_norm != total_norm:
@@ -1968,6 +1970,7 @@ class DeepSpeedZeroOptimizer_Stage3(object):
     def __partition_grads(self,
                           params_to_release: List[Parameter],
                           grad_partitions: List[Tensor]) -> None:
+        grad_buffer_lst = []
         for param, grad_partition in zip(params_to_release, grad_partitions):
             if param.ds_tensor.ds_numel * dist.get_rank(
                     self.dp_process_group) > param.ds_numel:
@@ -1981,22 +1984,26 @@ class DeepSpeedZeroOptimizer_Stage3(object):
                 grad_partition.numel())
             if self.micro_step_id == 0:  # don't accumulate
                 grad_buffer.copy_(grad_partition, non_blocking=True)
-                # ensure grad buffer is a CUDA buffer to speed up the next few
+                # ensure grad buffer is a NPU buffer to speed up the next few
                 # operations and so it can be used asynchronously
                 grad_buffer = grad_buffer.to(grad_partition.device, non_blocking=True)
-            elif grad_buffer.is_cuda:
+            elif grad_buffer.is_npu:
                 grad_buffer.add_(grad_partition)
             else:
                 # if dst is CPU, copy first to src device, do the addition
                 # there, then move back to dst. adding directly to cpu is very slow
-                cuda_grad_buffer = grad_buffer.to(grad_partition.device,
+                npu_grad_buffer = grad_buffer.to(grad_partition.device,
                                                   non_blocking=True)
-                cuda_grad_buffer.add_(grad_partition)
-                grad_buffer.copy_(cuda_grad_buffer, non_blocking=True)
-                # ensure grad buffer is a CUDA buffer to speed up the next few
+                npu_grad_buffer.add_(grad_partition)
+                grad_buffer.copy_(npu_grad_buffer, non_blocking=True)
+                # ensure grad buffer is a NPU buffer to speed up the next few
                 # operations and so it can be used asynchronously
-                grad_buffer = cuda_grad_buffer
+                grad_buffer = npu_grad_buffer
 
+            grad_buffer_lst.append(grad_buffer.data)
+
+            '''
+            # ASCEND AVOID OVERFLOW
             if hasattr(self.__inf_or_nan_tracker, "logical_or_"):
                 self.__inf_or_nan_tracker.logical_or_(torch.isinf(grad_buffer).any())
                 self.__inf_or_nan_tracker.logical_or_(torch.isnan(grad_buffer).any())
@@ -2005,6 +2012,7 @@ class DeepSpeedZeroOptimizer_Stage3(object):
                 self.__inf_or_nan_tracker += torch.isinf(grad_buffer).any()
                 self.__inf_or_nan_tracker += torch.isnan(grad_buffer).any()
                 self.__inf_or_nan_tracker = self.__inf_or_nan_tracker > 0
+            '''
 
             # offload the gradient partition if applicable
             if self.offload_optimizer:
@@ -2033,6 +2041,9 @@ class DeepSpeedZeroOptimizer_Stage3(object):
             # free the gradient
             param.grad.record_stream(torch.npu.current_stream())
             param.grad = None
+
+        overflow_flag = torch._amp_foreach_non_finite_check_(grad_buffer_lst)
+        self.__inf_or_nan_tracker = torch.BoolTensor([overflow_flag]).to(torch.npu.current_device())
 
         if self.offload_optimizer and self.swap_optimizer:
             for i in offload_fp32_gradients.keys():
@@ -2237,7 +2248,7 @@ class DeepSpeedZeroOptimizer_Stage3(object):
         for group in self.fp16_groups:
             for p in group:
                 if set_grads_to_None:
-                    if p.grad is not None and p.grad.is_cuda:
+                    if p.grad is not None and p.grad.is_npu:
                         p.grad.record_stream(torch.npu.current_stream())
                     p.grad = None
                 else:
@@ -2276,15 +2287,17 @@ class DeepSpeedZeroOptimizer_Stage3(object):
         norm_type = float(norm_type)
         if norm_type == inf:
             total_norm = max(g.data.abs().max() for g in gradients)
-            total_norm_cuda = torch.cuda.FloatTensor([float(total_norm)])
-            torch.distributed.all_reduce(total_norm_cuda,
+            total_norm_npu = torch.npu.FloatTensor([float(total_norm)])
+            if torch._amp_foreach_non_finite_check_([total_norm_npu]):
+                total_norm_npu = torch.npu.FloatTensor([float('inf')])
+            torch.distributed.all_reduce(total_norm_npu,
                                          op=torch.distributed.ReduceOp.MAX,
                                          group=self.dp_process_group)
 
             # Take max across all GPUs.
-            self._model_parallel_all_reduce(tensor=total_norm_cuda,
+            self._model_parallel_all_reduce(tensor=total_norm_npu,
                                             op=torch.distributed.ReduceOp.MAX)
-            total_norm = total_norm_cuda[0].item()
+            total_norm = total_norm_npu[0].item()
         else:
             # if dist.get_rank() == 0:
             #    logger.info(f"Total Norm beginning {total_norm}")
@@ -2294,16 +2307,17 @@ class DeepSpeedZeroOptimizer_Stage3(object):
                     grad_norms.append(g.npu(non_blocking=True).double().norm(2))
 
             # Sum across all model parallel GPUs.
-            total_norm_cuda = torch.sum(torch.pow(torch.stack(grad_norms), 2))
-
-            torch.distributed.all_reduce(total_norm_cuda,
+            total_norm_npu = torch.sum(torch.pow(torch.stack(grad_norms), 2))
+            if torch._amp_foreach_non_finite_check_([total_norm_npu]):
+                total_norm_npu = torch.npu.FloatTensor([float('inf')])
+            torch.distributed.all_reduce(total_norm_npu,
                                          op=torch.distributed.ReduceOp.SUM,
                                          group=self.dp_process_group)
 
-            self._model_parallel_all_reduce(tensor=total_norm_cuda,
+            self._model_parallel_all_reduce(tensor=total_norm_npu,
                                             op=torch.distributed.ReduceOp.SUM)
 
-            total_norm = total_norm_cuda.item()**(1. / norm_type)
+            total_norm = total_norm_npu.item()**(1. / norm_type)
 
         if total_norm == float(
                 'inf') or total_norm == -float('inf') or total_norm != total_norm:
@@ -2431,7 +2445,7 @@ class DeepSpeedZeroOptimizer_Stage3(object):
         # release all the gradient since we have already created a necessary copy in dp_grad_partition
         self.zero_grad()
 
-        for grad in filter(lambda g: g.is_cuda, self.averaged_gradients[sub_group_id]):
+        for grad in filter(lambda g: g.is_npu, self.averaged_gradients[sub_group_id]):
             grad.record_stream(torch.npu.current_stream())
 
         self.averaged_gradients[sub_group_id] = None
@@ -2652,7 +2666,7 @@ class DeepSpeedZeroOptimizer_Stage3(object):
                     "performance. if this is happening frequently consider adjusting "
                     "settings to reduce memory consumption. If you are unable to "
                     "make the cache flushes go away consider adding "
-                    "torch.cuda.empty_cache() calls in your training loop to ensure "
+                    "torch.npu.empty_cache() calls in your training loop to ensure "
                     "that all ranks flush their caches at the same time",
                     alloc_retries - self.__n_caching_allocator_flushes)
             self.__n_caching_allocator_flushes = alloc_retries
@@ -2707,23 +2721,19 @@ class DeepSpeedZeroOptimizer_Stage3(object):
 
     # `params` is a list / generator of torch.Variable
     def has_overflow_serial(self, params, is_grad_list=False):
-        for p in params:
-            if p.grad is not None and self._has_inf_or_nan(p.grad.data):
-                return True
-
-        return False
+        grads = [p.grad.data for p in params if p.grad is not None]
+        return torch._amp_foreach_non_finite_check_(grads)
 
     def has_overflow_partitioned_grads_serial(self):
+        grads = []
         for i in range(len(self.fp16_groups)):
             for j, grad in enumerate(self.averaged_gradients[i]):
-                if grad is not None and self._has_inf_or_nan(grad.data, j):
-                    return True
-        return False
+                if grad is not None:
+                    grads.append(grad.data)
+        return torch._amp_foreach_non_finite_check_(grads)
 
     @instrument_w_nvtx
     def has_overflow(self, partition_gradients=True):
-            # TODO: replace with NPU edition
-        return False
         if partition_gradients:
             with torch.npu.stream(self.__reduce_and_partition_stream):
                 self.local_overflow = bool(self.__inf_or_nan_tracker.item())
@@ -2731,8 +2741,8 @@ class DeepSpeedZeroOptimizer_Stage3(object):
 
             overflow = self.local_overflow
             #overflow = self.has_overflow_partitioned_grads_serial()
-            overflow_gpu = torch.cuda.ByteTensor([overflow])
-            torch.distributed.all_reduce(overflow_gpu,
+            overflow_npu = torch.npu.IntTensor([overflow])
+            torch.distributed.all_reduce(overflow_npu,
                                          op=torch.distributed.ReduceOp.MAX,
                                          group=self.dp_process_group)
 
@@ -2743,14 +2753,14 @@ class DeepSpeedZeroOptimizer_Stage3(object):
                     params.append(param)
 
             overflow = self.has_overflow_serial(params, is_grad_list=partition_gradients)
-            overflow_gpu = torch.cuda.ByteTensor([overflow])
+            overflow_npu = torch.npu.IntTensor([overflow])
 
         # Since each model parallel GPU carries only part of the model,
         # make sure overflow flag is synced across all the model parallel GPUs
-        self._model_parallel_all_reduce(tensor=overflow_gpu,
+        self._model_parallel_all_reduce(tensor=overflow_npu,
                                         op=torch.distributed.ReduceOp.MAX)
 
-        overflow = overflow_gpu[0].item()
+        overflow = overflow_npu[0].item()
         return bool(overflow)
 
     # `x` is a torch.Tensor
@@ -3081,7 +3091,7 @@ class DeepSpeedZeroOptimizer_Stage3(object):
         will call ``model.load_state_dict()`` before
         ``fp16_optimizer_instance.load_state_dict()`` is called.
         Example::
-            model = torch.nn.Linear(D_in, D_out).cuda().half()
+            model = torch.nn.Linear(D_in, D_out).npu().half()
             optimizer = torch.optim.SGD(model.parameters(), lr=1e-3)
             optimizer = FP16_Optimizer(optimizer, static_loss_scale = 128.0)
             ...

@@ -38,8 +38,8 @@ class FP16_Optimizer(object):
         self.timers = timers
         self.deepspeed = deepspeed
         self.using_pipeline = self.deepspeed.pipeline_parallelism
-        if not torch.cuda.is_available:
-            raise SystemError("Cannot use fp16 without CUDA.")
+        if not torch.npu.is_available:
+            raise SystemError("Cannot use fp16 without NPU.")
         self.optimizer = init_optimizer
 
         # param flattened by groups
@@ -415,7 +415,7 @@ class FP16_Optimizer(object):
         will call ``model.load_state_dict()`` before
         ``fp16_optimizer_instance.load_state_dict()`` is called.
         Example::
-            model = torch.nn.Linear(D_in, D_out).cuda().half()
+            model = torch.nn.Linear(D_in, D_out).npu().half()
             optimizer = torch.optim.SGD(model.parameters(), lr=1e-3)
             optimizer = FP16_Optimizer(optimizer, static_loss_scale = 128.0)
             ...

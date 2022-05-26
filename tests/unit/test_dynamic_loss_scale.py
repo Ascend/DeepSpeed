@@ -1,4 +1,4 @@
-import torch
+import torch, torch_npu
 import deepspeed
 import argparse
 import pytest
@@ -9,11 +9,19 @@ from .common import distributed_test
 from .simple_model import SimpleModel, args_from_dict
 
 
+def make_device_overflow():
+    float_tensor = torch.tensor([40000.0], dtype=torch.float16).npu()
+    float_tensor = float_tensor + float_tensor
+
+
 def run_model_step(model, gradient_list):
     for value in gradient_list:
         for p in model.parameters():
             p.grad = torch.empty_like(p, dtype=p.dtype)
-            p.grad.fill_(value)
+            if value == float('inf') or value == -float('inf') or value != value:
+                make_device_overflow()
+            else:
+                p.grad.fill_(value)
         model.step()
 
 
