@@ -40,7 +40,7 @@ def test_clip_grad_norm_():
         norm = torch.Tensor([norm]).to(dist.get_rank())
 
         world_size = dist.get_world_size()
-        gathered_norm = [torch.zeros(1).cuda() for i in range(world_size)]
+        gathered_norm = [torch.zeros(1).npu() for i in range(world_size)]
 
         torch.distributed.all_gather(gathered_norm, norm)
 

@@ -197,6 +197,9 @@ class CheckOverflow(object):
         if self.mpu is not None:
             torch.distributed.all_reduce(overflow_npu,
                                          op=torch.distributed.ReduceOp.MAX,
+                                         group=self.mpu.get_data_parallel_group())
+            torch.distributed.all_reduce(overflow_npu,
+                                         op=torch.distributed.ReduceOp.MAX,
                                          group=self.mpu.get_model_parallel_group())
         elif reduce_overflow:
             dist.all_reduce(overflow_npu, op=torch.distributed.ReduceOp.MAX)
@@ -248,17 +251,10 @@ class CheckOverflow(object):
                                          op=torch.distributed.ReduceOp.MAX,
                                          group=torch.distributed.group.WORLD)
         elif self.mpu is not None:
-            if self.deepspeed is not None:
-                using_pipeline = hasattr(self.deepspeed,
-                                         'pipeline_enable_backward_allreduce')
-                if (using_pipeline
-                        and self.deepspeed.pipeline_enable_backward_allreduce is False
-                    ) or (not using_pipeline
-                          and self.deepspeed.enable_backward_allreduce is False):
-                    torch.distributed.all_reduce(
-                        overflow_npu,
-                        op=torch.distributed.ReduceOp.MAX,
-                        group=self.mpu.get_data_parallel_group())
+            # ASCEND AVOID OVERFLOW
+            torch.distributed.all_reduce(overflow_npu,
+                                         op=torch.distributed.ReduceOp.MAX,
+                                         group=self.mpu.get_data_parallel_group())
             torch.distributed.all_reduce(overflow_npu,
                                          op=torch.distributed.ReduceOp.MAX,
                                          group=self.mpu.get_model_parallel_group())

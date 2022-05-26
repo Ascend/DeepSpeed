@@ -1869,13 +1869,6 @@ class DeepSpeedZeroOptimizer(object):
         if partition_gradients:
             overflow = self.local_overflow if self.cpu_offload else self.has_overflow_partitioned_grads_serial(
             )
-            overflow_npu = torch.npu.IntTensor([overflow])
-            '''This will capture overflow across all data parallel and expert parallel process
-            Since expert parallel process are a subset of data parallel process'''
-            torch.distributed.all_reduce(overflow_npu,
-                                         op=torch.distributed.ReduceOp.MAX,
-                                         group=self.dp_process_group)
-
         else:
             params = []
             for group in self.bit16_groups:
@@ -1883,7 +1876,11 @@ class DeepSpeedZeroOptimizer(object):
                     params.append(param)
 
             overflow = self.has_overflow_serial(params, is_grad_list=partition_gradients)
-            overflow_npu = torch.npu.IntTensor([overflow])
+        
+        overflow_npu = torch.npu.IntTensor([overflow])
+        torch.distributed.all_reduce(overflow_npu,
+                                     op=torch.distributed.ReduceOp.MAX,
+                                     group=self.dp_process_group)
 
         # Since each model parallel GPU carries only part of the model,
         # make sure overflow flag is synced across all the model parallel GPUs
