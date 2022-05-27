@@ -1158,9 +1158,6 @@ class DeepSpeedZeroOptimizer(object):
 
         # Sum across all model parallel GPUs.
         total_norm_npu = torch.npu.FloatTensor([float(total_norm)])
-        if torch._amp_foreach_non_finite_check_([total_norm_npu]):
-            total_norm_npu = torch.npu.FloatTensor([float('inf')])
-
         torch.distributed.all_reduce(total_norm_npu,
                                      op=torch.distributed.ReduceOp.SUM,
                                      group=self.dp_process_group)
@@ -1170,8 +1167,17 @@ class DeepSpeedZeroOptimizer(object):
 
         total_norm = total_norm_npu[0].item()**(1. / norm_type)
 
-        if total_norm == float(
-                'inf') or total_norm == -float('inf') or total_norm != total_norm:
+        overflow = torch._amp_foreach_non_finite_check_([total_norm_npu])
+        overflow_npu = torch.npu.IntTensor([overflow])
+        torch.distributed.all_reduce(overflow_npu,
+                                     op=torch.distributed.ReduceOp.MAX,
+                                     group=self.dp_process_group)
+
+        self._model_parallel_all_reduce(tensor=overflow_npu,
+                                        op=torch.distributed.ReduceOp.MAX)
+
+        if overflow_npu.item() or total_norm == float('inf') or \
+            total_norm == -float('inf') or total_norm != total_norm:
             total_norm = -1
 
         return total_norm
@@ -1536,8 +1542,6 @@ class DeepSpeedZeroOptimizer(object):
         if norm_type == inf:
             total_norm = max(g.data.abs().max() for g in gradients)
             total_norm_npu = torch.npu.FloatTensor([float(total_norm)])
-            if torch._amp_foreach_non_finite_check_([total_norm_npu]):
-                total_norm_npu = torch.npu.FloatTensor([float('inf')])
             torch.distributed.all_reduce(total_norm_npu,
                                          op=torch.distributed.ReduceOp.MAX,
                                          group=self.dp_process_group)
@@ -1559,8 +1563,6 @@ class DeepSpeedZeroOptimizer(object):
                     total_norm += param_norm.item()**2
             # Sum across all model parallel GPUs.
             total_norm_npu = torch.npu.FloatTensor([float(total_norm)])
-            if torch._amp_foreach_non_finite_check_([total_norm_npu]):
-                total_norm_npu = torch.npu.FloatTensor([float('inf')])
             torch.distributed.all_reduce(total_norm_npu,
                                          op=torch.distributed.ReduceOp.SUM,
                                          group=self.dp_process_group)
@@ -1570,8 +1572,17 @@ class DeepSpeedZeroOptimizer(object):
 
             total_norm = total_norm_npu[0].item()**(1. / norm_type)
 
-        if total_norm == float(
-                'inf') or total_norm == -float('inf') or total_norm != total_norm:
+        overflow = torch._amp_foreach_non_finite_check_([total_norm_npu])
+        overflow_npu = torch.npu.IntTensor([overflow])
+        torch.distributed.all_reduce(overflow_npu,
+                                     op=torch.distributed.ReduceOp.MAX,
+                                     group=self.dp_process_group)
+        
+        self._model_parallel_all_reduce(tensor=overflow_npu,
+                                        op=torch.distributed.ReduceOp.MAX)
+
+        if overflow_npu.item() or total_norm == float('inf') or \
+            total_norm == -float('inf') or total_norm != total_norm:
             total_norm = -1
 
         return total_norm

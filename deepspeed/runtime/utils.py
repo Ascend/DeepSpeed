@@ -407,8 +407,6 @@ def get_grad_norm(parameters, norm_type=2, mpu=None):
     if norm_type == inf:
         total_norm = max(p.grad.data.abs().max() for p in parameters)
         total_norm_npu = torch.npu.FloatTensor([float(total_norm)])
-        if torch._amp_foreach_non_finite_check_([total_norm_npu]):
-            total_norm_npu = torch.npu.FloatTensor([float('inf')])
         # Take max across all GPUs.
         if mpu is not None:
             torch.distributed.all_reduce(total_norm_npu,
@@ -433,8 +431,6 @@ def get_grad_norm(parameters, norm_type=2, mpu=None):
 
         # Sum across all model parallel GPUs.
         total_norm_npu = torch.npu.FloatTensor([float(total_norm)])
-        if torch._amp_foreach_non_finite_check_([total_norm_npu]):
-            total_norm_npu = torch.npu.FloatTensor([float('inf')])
         if mpu is not None:
             # ASCEND VOID OVERFLOW
             torch.distributed.all_reduce(total_norm_npu,
@@ -442,8 +438,16 @@ def get_grad_norm(parameters, norm_type=2, mpu=None):
                                          group=mpu.get_model_parallel_group())
         total_norm = total_norm_npu[0].item()**(1. / norm_type)
 
-    if total_norm == float(
-            'inf') or total_norm == -float('inf') or total_norm != total_norm:
+    overflow = torch._amp_foreach_non_finite_check_([total_norm_npu])
+    if mpu is not None:
+        overflow_npu = torch.npu.IntTensor([overflow])
+        torch.distributed.all_reduce(overflow_npu,
+                                     op=torch.distributed.ReduceOp.MAX,
+                                     group=mpu.get_model_parallel_group())
+        overflow = overflow_npu.item()
+
+    if overflow or total_norm == float('inf') or \
+        total_norm == -float('inf') or total_norm != total_norm:
         total_norm = -1
 
     return total_norm
@@ -515,8 +519,6 @@ def get_weight_norm(parameters, norm_type=2, mpu=None):
     if norm_type == inf:
         total_norm = max(p.data.abs().max() for p in parameters)
         total_norm_npu = torch.npu.FloatTensor([float(total_norm)])
-        if torch._amp_foreach_non_finite_check_([total_norm_npu]):
-            total_norm_npu = torch.npu.FloatTensor([float('inf')])
         # Take max across all GPUs.
         if mpu is not None:
             torch.distributed.all_reduce(total_norm_npu,
@@ -541,16 +543,22 @@ def get_weight_norm(parameters, norm_type=2, mpu=None):
 
         # Sum across all model parallel GPUs.
         total_norm_npu = torch.npu.FloatTensor([float(total_norm)])
-        if torch._amp_foreach_non_finite_check_([total_norm_npu]):
-            total_norm_npu = torch.npu.FloatTensor([float('inf')])
         if mpu is not None:
             torch.distributed.all_reduce(total_norm_npu,
                                          op=torch.distributed.ReduceOp.SUM,
                                          group=mpu.get_model_parallel_group())
         total_norm = total_norm_npu[0].item()**(1. / norm_type)
 
-    if total_norm == float(
-            'inf') or total_norm == -float('inf') or total_norm != total_norm:
+    overflow = torch._amp_foreach_non_finite_check_([total_norm_npu])
+    if mpu is not None:
+        overflow_npu = torch.npu.IntTensor([overflow])
+        torch.distributed.all_reduce(overflow_npu,
+                                     op=torch.distributed.ReduceOp.MAX,
+                                     group=mpu.get_model_parallel_group())
+        overflow = overflow_npu.item()
+
+    if overflow or total_norm == float('inf') or \
+        total_norm == -float('inf') or total_norm != total_norm:
         total_norm = -1
 
     return total_norm

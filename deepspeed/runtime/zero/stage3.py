@@ -1948,9 +1948,6 @@ class DeepSpeedZeroOptimizer_Stage3(object):
 
         # Sum across all model parallel GPUs.
         total_norm_npu = torch.npu.FloatTensor([float(total_norm)])
-        if torch._amp_foreach_non_finite_check_([total_norm_npu]):
-            total_norm_npu = torch.npu.FloatTensor([float('inf')])
-
         torch.distributed.all_reduce(total_norm_npu,
                                      op=torch.distributed.ReduceOp.SUM,
                                      group=self.dp_process_group)
@@ -1960,8 +1957,17 @@ class DeepSpeedZeroOptimizer_Stage3(object):
 
         total_norm = total_norm_npu[0].item()**(1. / norm_type)
 
-        if total_norm == float(
-                'inf') or total_norm == -float('inf') or total_norm != total_norm:
+        overflow = torch._amp_foreach_non_finite_check_([total_norm_npu])
+        overflow_npu = torch.npu.IntTensor([overflow])
+        torch.distributed.all_reduce(overflow_npu,
+                                     op=torch.distributed.ReduceOp.MAX,
+                                     group=self.dp_process_group)
+
+        self._model_parallel_all_reduce(tensor=overflow_npu,
+                                        op=torch.distributed.ReduceOp.MAX)
+
+        if overflow_npu.item() or total_norm == float('inf') or \
+            total_norm == -float('inf') or total_norm != total_norm:
             total_norm = -1
 
         return total_norm
@@ -2042,8 +2048,8 @@ class DeepSpeedZeroOptimizer_Stage3(object):
             param.grad.record_stream(torch.npu.current_stream())
             param.grad = None
 
-        overflow_flag = torch._amp_foreach_non_finite_check_(grad_buffer_lst)
-        self.__inf_or_nan_tracker = torch.BoolTensor([overflow_flag]).to(torch.npu.current_device())
+        overflow_npu = torch._amp_foreach_non_finite_check_(grad_buffer_lst)
+        self.__inf_or_nan_tracker = torch.BoolTensor([overflow_npu]).to(torch.npu.current_device())
 
         if self.offload_optimizer and self.swap_optimizer:
             for i in offload_fp32_gradients.keys():
@@ -2288,8 +2294,6 @@ class DeepSpeedZeroOptimizer_Stage3(object):
         if norm_type == inf:
             total_norm = max(g.data.abs().max() for g in gradients)
             total_norm_npu = torch.npu.FloatTensor([float(total_norm)])
-            if torch._amp_foreach_non_finite_check_([total_norm_npu]):
-                total_norm_npu = torch.npu.FloatTensor([float('inf')])
             torch.distributed.all_reduce(total_norm_npu,
                                          op=torch.distributed.ReduceOp.MAX,
                                          group=self.dp_process_group)
@@ -2308,8 +2312,6 @@ class DeepSpeedZeroOptimizer_Stage3(object):
 
             # Sum across all model parallel GPUs.
             total_norm_npu = torch.sum(torch.pow(torch.stack(grad_norms), 2))
-            if torch._amp_foreach_non_finite_check_([total_norm_npu]):
-                total_norm_npu = torch.npu.FloatTensor([float('inf')])
             torch.distributed.all_reduce(total_norm_npu,
                                          op=torch.distributed.ReduceOp.SUM,
                                          group=self.dp_process_group)
@@ -2318,9 +2320,18 @@ class DeepSpeedZeroOptimizer_Stage3(object):
                                             op=torch.distributed.ReduceOp.SUM)
 
             total_norm = total_norm_npu.item()**(1. / norm_type)
+        
+        overflow = torch._amp_foreach_non_finite_check_([total_norm_npu])
+        overflow_npu = torch.npu.IntTensor([overflow])
+        torch.distributed.all_reduce(overflow_npu,
+                                     op=torch.distributed.ReduceOp.MAX,
+                                     group=self.dp_process_group)
 
-        if total_norm == float(
-                'inf') or total_norm == -float('inf') or total_norm != total_norm:
+        self._model_parallel_all_reduce(tensor=overflow_npu,
+                                        op=torch.distributed.ReduceOp.MAX)
+
+        if overflow_npu.item() or total_norm == float('inf') or \
+            total_norm == -float('inf') or total_norm != total_norm:
             total_norm = -1
 
         return total_norm
