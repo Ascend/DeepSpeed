@@ -16,7 +16,7 @@
 #    https://github.com/NVIDIA/Megatron-LM/blob/master/fp16/loss_scaler.py
 #Commit: 93ab4bea59dc5cbf97c079d313741866af4deac9
 
-import torch
+import torch, torch_npu
 
 INITIAL_LOSS_SCALE = 'init_scale'
 SCALE_WINDOW = 'scale_window'
@@ -120,11 +120,8 @@ class DynamicLossScaler(LossScalerBase):
 
     # `params` is a list / generator of torch.Variable
     def has_overflow_serial(self, params):
-        for p in params:
-            if p.grad is not None and self._has_inf_or_nan(p.grad.data):
-                return True
-
-        return False
+        grads = [p.grad.data for p in params if p.grad is not None]
+        return torch._amp_foreach_non_finite_check_(grads)
 
     # `x` is a torch.Tensor
     def _has_inf_or_nan(x):

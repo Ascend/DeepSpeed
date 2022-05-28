@@ -87,10 +87,10 @@ except ImportError:
 
 def split_half_float_double_sparse(tensors):
     supported_types = [
-        "torch.cuda.HalfTensor",
-        "torch.cuda.FloatTensor",
-        "torch.cuda.DoubleTensor",
-        "torch.cuda.BFloat16Tensor",
+        "torch.npu.HalfTensor",
+        "torch.npu.FloatTensor",
+        "torch.npu.DoubleTensor",
+        "torch.npu.BFloat16Tensor",
         SparseTensor.type()
     ]
 
@@ -1139,27 +1139,46 @@ class DeepSpeedEngine(Module):
             else:
                 if self.zero_cpu_offload():
                     if self.optimizer_name() == ADAGRAD_OPTIMIZER:
+                        '''
+                        # ASCEND VOID OPT
                         from deepspeed.ops.adagrad import DeepSpeedCPUAdagrad
                         optimizer = DeepSpeedCPUAdagrad(model_parameters,
                                                         **optimizer_parameters)
+                        '''
+                        optimizer = torch.optim.Adagrad(
+                            model_parameters,
+                            **optimizer_parameters,
+                        )
                     else:
+                        '''
+                        # ASCEND VOID OPT
                         from deepspeed.ops.adam import DeepSpeedCPUAdam
                         optimizer = DeepSpeedCPUAdam(model_parameters,
                                                      **optimizer_parameters,
                                                      adamw_mode=effective_adam_w_mode)
+                        '''
+                        optimizer = torch.optim.Adam(
+                            model_parameters,
+                            **optimizer_parameters,
+                        )
                 else:
-                    from deepspeed.ops.adam import FusedAdam
+                    # ASCEND VOID OPT
+                    # from deepspeed.ops.adam import FusedAdam
 
-                    optimizer = FusedAdam(
+                    optimizer = torch.optim.Adam(
                         model_parameters,
                         **optimizer_parameters,
-                        adam_w_mode=effective_adam_w_mode,
                     )
 
         elif self.optimizer_name() == LAMB_OPTIMIZER:
+            '''
+            # ASCEND VOID OPT
             from deepspeed.ops.lamb import FusedLamb
-
             optimizer = FusedLamb(model_parameters, **optimizer_parameters)
+            '''
+            from apex.optimizers import Lamb
+
+            optimizer = Lamb(model_parameters, **optimizer_parameters)
         elif self.optimizer_name() == ONEBIT_ADAM_OPTIMIZER:
             assert not self.zero_optimization(), "1bit-Adam is not compatible with ZeRO"
             from deepspeed.runtime.fp16.onebit.adam import OnebitAdam

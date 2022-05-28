@@ -38,8 +38,8 @@ class FP16_UnfusedOptimizer(object):
         if torch.distributed.get_rank() == 0:
             logger.info(f'Fused Lamb Legacy : {self.fused_lamb_legacy} ')
 
-        if not torch.cuda.is_available:
-            raise SystemError("Cannot use fp16 without CUDA.")
+        if not torch.npu.is_available:
+            raise SystemError("Cannot use fp16 without NPU.")
         self.optimizer = init_optimizer
 
         # param groups
@@ -186,9 +186,11 @@ class FP16_UnfusedOptimizer(object):
         """
         Not supporting closure.
         """
-
+        '''
+        # ASCEND VOID OPT
         if self.fused_lamb_legacy:
             return self.step_fused_lamb()
+        '''
 
         self.overflow = self.overflow_checker.check()
         prev_scale = self.cur_scale
@@ -350,7 +352,7 @@ class FP16_UnfusedOptimizer(object):
         will call ``model.load_state_dict()`` before
         ``fp16_optimizer_instance.load_state_dict()`` is called.
         Example::
-            model = torch.nn.Linear(D_in, D_out).cuda().half()
+            model = torch.nn.Linear(D_in, D_out).npu().half()
             optimizer = torch.optim.SGD(model.parameters(), lr=1e-3)
             optimizer = FP16_Optimizer(optimizer, static_loss_scale = 128.0)
             ...
@@ -394,14 +396,12 @@ class FP16_UnfusedOptimizer(object):
         for i, group in enumerate(self.fp16_groups):
             for param in group:
                 param.grad = torch.zeros(param.size(),
-                                         dtype=param.dtype,
-                                         device=torch.cuda.current_device())
+                                         dtype=param.dtype).to(torch.npu.current_device())
 
         for i, group in enumerate(self.fp32_groups):
             for param in group:
                 param.grad = torch.zeros(param.size(),
-                                         dtype=param.dtype,
-                                         device=torch.cuda.current_device())
+                                         dtype=param.dtype).to(torch.npu.current_device())
 
         self.optimizer.step()
 
