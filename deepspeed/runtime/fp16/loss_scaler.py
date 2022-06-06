@@ -17,6 +17,7 @@
 #Commit: 93ab4bea59dc5cbf97c079d313741866af4deac9
 
 import torch, torch_npu
+from torch_npu.npu import clear_npu_overflow_flag
 
 INITIAL_LOSS_SCALE = 'init_scale'
 SCALE_WINDOW = 'scale_window'
@@ -49,6 +50,7 @@ class LossScalerBase:
         pass
 
     def backward(self, loss, retain_graph=False):
+        clear_npu_overflow_flag()
         scaled_loss = loss * self.loss_scale
         scaled_loss.backward(retain_graph=retain_graph)
 
