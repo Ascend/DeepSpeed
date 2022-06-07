@@ -7,6 +7,7 @@ This file is adapted from FP16_Optimizer in NVIDIA/apex
 
 import torch
 from torch._utils import _flatten_dense_tensors, _unflatten_dense_tensors
+from torch_npu.npu import clear_npu_overflow_flag
 
 from deepspeed.runtime.utils import get_global_norm, get_grad_norm, CheckOverflow, get_weight_norm
 from deepspeed.runtime.fp16.loss_scaler import INITIAL_LOSS_SCALE, SCALE_WINDOW, MIN_LOSS_SCALE
@@ -325,6 +326,7 @@ class FP16_Optimizer(object):
         2. scaled_loss = fp32_loss*loss_scale
         3. scaled_loss.backward(), which accumulates scaled gradients into the ``.grad`` attributes of the model's fp16 leaves
         """
+        clear_npu_overflow_flag()
         scaled_loss = (loss.float()) * self.cur_scale
 
         scaled_loss.backward(create_graph=create_graph, retain_graph=retain_graph)
