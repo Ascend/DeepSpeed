@@ -87,7 +87,8 @@ class _AllToAll(torch.autograd.Function):
                 group: dist.ProcessGroup,
                 input: Tensor) -> Tensor:  # type: ignore
         ctx.group = group
-        input = input.contiguous()
+        # ASCEND AVOID
+        input = input.contiguous().npu_format_cast(2)
         output = torch.empty_like(input)
         dist.all_to_all_single(output, input, group=group)
         return output
@@ -144,7 +145,7 @@ def einsum(rule, a, b):
 # includes stateful caching logic which is incompatible with ONNX.
 
 
-@torch.jit.script
+#@torch.jit.script
 def _capacity(gates: Tensor, capacity_factor: Tensor, min_capacity: Tensor) -> Tensor:
     # gates has shape of SE
     num_tokens = gates.shape[0]
@@ -157,14 +158,15 @@ def _capacity(gates: Tensor, capacity_factor: Tensor, min_capacity: Tensor) -> T
     return capacity
 
 
-@torch.jit.script
+#@torch.jit.script
 def _top_idx(source, k):
     return torch.topk(source, k=k, dim=0)[1]
 
 
-@torch.jit.script
+#@torch.jit.script
 def _one_hot_to_float(x, num_classes):
-    return F.one_hot(x, num_classes=num_classes).float()
+    # ASCEND AVOID
+    return F.one_hot(x.int(), num_classes=num_classes).float()
 
 
 def top1gating(logits: Tensor,
@@ -194,7 +196,8 @@ def top1gating(logits: Tensor,
         logits_w_noise if noisy_gate_policy == 'RSample' else gates,
         dim=1)
     num_experts = int(gates.shape[1])
-    mask1 = F.one_hot(indices1_s, num_classes=num_experts)
+    # ASCEND AVOID
+    mask1 = F.one_hot(indices1_s.int(), num_classes=num_experts)
 
     # mask only used tokens
     if used_token is not None:
@@ -284,7 +287,8 @@ def top2gating(logits: Tensor,
     # Create a mask for 1st's expert per token
     indices1_s = torch.argmax(gates, dim=1)
     num_experts = int(gates.shape[1])
-    mask1 = F.one_hot(indices1_s, num_classes=num_experts)
+    # ASCEND AVOID
+    mask1 = F.one_hot(indices1_s.int(), num_classes=num_experts)
 
     # Create a mask for 2nd's expert per token using Gumbel-max trick
     # https://timvieira.github.io/blog/post/2014/07/31/gumbel-max-trick/
@@ -292,7 +296,8 @@ def top2gating(logits: Tensor,
     # Replace top-expert with min value
     logits_except1 = logits_w_noise.masked_fill(mask1.bool(), float("-inf"))
     indices2_s = torch.argmax(logits_except1, dim=1)
-    mask2 = F.one_hot(indices2_s, num_classes=num_experts)
+    # ASCEND AVOID
+    mask2 = F.one_hot(indices2_s.int(), num_classes=num_experts)
 
     # Compute locations in capacity buffer
     locations1 = torch.cumsum(mask1, dim=0) - 1
