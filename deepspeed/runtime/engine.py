@@ -829,8 +829,12 @@ class DeepSpeedEngine(Module):
             args,
             'device_rank') else self.local_rank
         if device_rank >= 0:
-            torch.npu.set_device(device_rank)
-            self.device = torch.device("npu", device_rank)
+            # torch.npu.set_device(device_rank)
+            # self.device = torch.device("npu", device_rank)
+            device_ids = list(map(int, os.environ['ASCEND_VISIBLE_DEVICES'].strip().split(',')))
+            torch.npu.set_device(device_ids[device_rank])
+            self.device = torch.device("npu", device_ids[device_rank])
+
             self.world_size = dist.get_world_size()
             self.global_rank = dist.get_rank()
         else:
