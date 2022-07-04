@@ -568,7 +568,6 @@ class DeepSpeedZeroOptimizer(object):
             self.grads_in_partition_offset = 0
 
     def initialize_optimizer_states(self):
-        print("TODO:", " torch.ones([2,3], device=1) not support")
         for i, group in enumerate(self.bit16_groups):
             # single_grad_partition = torch.zeros(
             #     int(self.partition_size[i]),
@@ -1818,8 +1817,11 @@ class DeepSpeedZeroOptimizer(object):
                         shard_id * shard_size,
                         num_elements).detach()
                     shard_list.append(curr_shard)
+                # ASCEND AVOID
+                tmp = shard_list[partition_id].clone()
                 dist.all_gather(shard_list,
-                                shard_list[partition_id],
+                                # shard_list[partition_id],
+                                tmp,
                                 group=self.real_dp_process_group[group_id])
         self.stop_timers([OPTIMIZER_ALLGATHER])
 
@@ -1932,7 +1934,6 @@ class DeepSpeedZeroOptimizer(object):
         3. scaled_loss.backward(), which accumulates scaled gradients into the ``.grad`` attributes of the model's fp16 leaves
         """
         self.micro_step_id += 1
-        print("TODO:", " torch.ones([2,3], device=1) not support")
         if self.contiguous_gradients:
             self.ipg_buffer = []
             # buf_0 = torch.empty(int(self.reduce_bucket_size),
