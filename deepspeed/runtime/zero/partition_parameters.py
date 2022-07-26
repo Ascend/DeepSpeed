@@ -59,9 +59,11 @@ else:
         output_tensors = list(
             torch.chunk(output_tensor,
                         torch.distributed.get_world_size(group)))
+        # ASCEND AVOID
         return instrument_w_nvtx(torch.distributed.all_gather)(
             output_tensors,
-            input_tensor,
+            input_tensor.clone(),
+            # input_tensor,
             group=group,
             async_op=True,
         )
@@ -213,7 +215,7 @@ def zero_wrapper_for_fp_tensor_constructor(fn: Callable,
                                            target_fp_dtype: torch.dtype) -> Callable:
     def wrapped_fn(*args, **kwargs) -> Tensor:
         if kwargs.get("device", None) is None:
-            kwargs['device'] = torch.device('cuda:{}'.format(os.environ["LOCAL_RANK"]))
+            kwargs['device'] = torch.device('npu:{}'.format(os.environ["LOCAL_RANK"]))
         tensor: Tensor = fn(*args, **kwargs)
         if tensor.is_floating_point():
             tensor = tensor.to(target_fp_dtype)
@@ -225,7 +227,7 @@ def zero_wrapper_for_fp_tensor_constructor(fn: Callable,
 
 def get_new_tensor_fn_for_dtype(dtype: torch.dtype) -> Callable:
     def new_tensor(cls, *args) -> Tensor:
-        device = torch.device('cuda:{}'.format(os.environ["LOCAL_RANK"]))
+        device = torch.device('npu:{}'.format(os.environ["LOCAL_RANK"]))
         tensor = _orig_torch_empty(0, device=device).new_empty(*args)
         if tensor.is_floating_point():
             tensor = tensor.to(dtype)
@@ -1230,9 +1232,9 @@ class Init(InsertPostInitMethodToModuleSubClasses):
 
                 if i == dist.get_rank(group=self.ds_process_group):
                     partitions[i].data.copy_(param.ds_tensor.data, non_blocking=True)
-
+            # ASCEND AVOID
             handle = dist.all_gather(partitions,
-                                     partitions[self.rank],
+                                     partitions[self.rank].clone(),
                                      group=self.ds_process_group,
                                      async_op=async_op)
 
@@ -1288,8 +1290,9 @@ class Init(InsertPostInitMethodToModuleSubClasses):
                         )
 
                 # back to old all_gather function signature
+                # ASCEND AVOID
                 h = dist.all_gather(output_list,
-                                    input_tensor,
+                                    input_tensor.clone(),
                                     group=self.ds_process_group,
                                     async_op=True)
             launch_handles.append(h)
@@ -1336,9 +1339,9 @@ class Init(InsertPostInitMethodToModuleSubClasses):
                                          param_numel).copy_(param.ds_tensor.data)
 
                     offset += param_numel
-
+        # ASCEND AVOID
         torch.distributed.all_gather(partitions,
-                                     partitions[self.rank],
+                                     partitions[self.rank].clone(),
                                      group=self.ds_process_group,
                                      async_op=False)
         param_offset = 0

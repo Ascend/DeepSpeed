@@ -30,14 +30,14 @@ else:
             torch.chunk(input_tensor,
                         torch.distributed.get_world_size(group)))
         # ASCEND AVOID
-        for i in range(len(input_tensor_lst)):
-            input_tensor_lst[i] = input_tensor_lst[i].clone()
-        output_tensor = output_tensor.clone()
+        new_input_tensor_lst = [x.clone() for x in input_tensor_lst]
+        new_output_tensor = output_tensor.clone()
         instrument_w_nvtx(torch.distributed.reduce_scatter)(
-            output_tensor,
-            input_tensor_lst,
+            new_output_tensor,
+            new_input_tensor_lst,
             group=group,
         )
+        output_tensor.copy_(new_output_tensor)
 
 
 @instrument_w_nvtx

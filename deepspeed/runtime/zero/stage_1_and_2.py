@@ -143,13 +143,7 @@ class DeepSpeedZeroOptimizer(object):
 
         # Load pre-built or JIT compile (un)flatten ops
         util_ops = UtilsBuilder().load()
-        # ASCEND AVOID
-        def flatten_tmp(lst):
-            for i in range(len(lst)):
-                lst[i] = lst[i].cpu()
-            return util_ops.flatten(lst).npu()
-        # self.flatten = util_ops.flatten
-        self.flatten = flatten_tmp
+        self.flatten = util_ops.flatten
         self.unflatten = util_ops.unflatten
 
         # ZeRO stage 1 (False) or 2 (True)
