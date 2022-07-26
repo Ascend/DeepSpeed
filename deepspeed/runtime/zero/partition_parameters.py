@@ -60,13 +60,17 @@ else:
             torch.chunk(output_tensor,
                         torch.distributed.get_world_size(group)))
         # ASCEND AVOID
-        return instrument_w_nvtx(torch.distributed.all_gather)(
-            output_tensors,
+        new_output_tensors = [x.clone() for x in output_tensors]
+        instrument_w_nvtx(torch.distributed.all_gather)(
+            new_output_tensors,
             input_tensor.clone(),
             # input_tensor,
             group=group,
-            async_op=True,
+            async_op=False,
         )
+        for i in range(len(new_output_tensors)):
+            output_tensors[i].copy_(new_output_tensors[i])
+        return torch.distributed.barrier(async_op=True)
 
 
 def print_rank_0(message, debug=False, force=False):

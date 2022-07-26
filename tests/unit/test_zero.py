@@ -837,10 +837,8 @@ def test_zero3_param_partitioning_large_param(world_sz: int,
 
 # ASCEND AVOID
 @pytest.mark.parametrize("world_sz", [1, 2, 4])
-@pytest.mark.parametrize("param_sz", [10_000])
-@pytest.mark.parametrize("n_layers", [1_000])
-# @pytest.mark.parametrize("param_sz", [100, 1_000, 10_000])
-# @pytest.mark.parametrize("n_layers", [100, 1_000])
+@pytest.mark.parametrize("param_sz", [100, 1_000, 10_000])
+@pytest.mark.parametrize("n_layers", [100, 1_000])
 # @pytest.mark.parametrize("init_context_manager", [True, False])
 @pytest.mark.parametrize("init_context_manager", [False])
 def test_zero3_param_partitioning_many_params(world_sz: int,
