@@ -370,7 +370,8 @@ def test_incorrect_allgather_bucket_size(tmpdir, zero_stage, allgather_bucket_si
         "optimizer": {
             "type": "Adam",
             "params": {
-                "lr": 1e-3
+                "lr": 1e-3,
+                "torch_adam": True
             }
         },
         "fp16": {
@@ -753,11 +754,9 @@ def test_zero3_param_partitioning_base(
 
     _test_zero3_param_partitioning()
 
-# ASCEND AVOID
 @pytest.mark.parametrize("world_sz", [1, 2, 4])
 @pytest.mark.parametrize("param_sz", [8100])
-# @pytest.mark.parametrize("init_context_manager", [True, False])
-@pytest.mark.parametrize("init_context_manager", [False])
+@pytest.mark.parametrize("init_context_manager", [True, False])
 def test_zero3_param_partitioning_large_param(world_sz: int,
                                               param_sz: int,
                                               init_context_manager: bool) -> None:
@@ -765,7 +764,6 @@ def test_zero3_param_partitioning_large_param(world_sz: int,
         def __init__(self):
             super().__init__()
             self.param = Parameter(torch.zeros((param_sz, ), dtype=torch.float32))
-
             # only do weight initialization on root rank to
             # make sure we are broadcasting correctly from rank 0
             if dist.get_rank() == 0:
@@ -792,7 +790,8 @@ def test_zero3_param_partitioning_large_param(world_sz: int,
             "optimizer": {
                 "type": "Adam",
                 "params": {
-                    "lr": 1.
+                    "lr": 1.,
+                    "torch_adam": True
                 }
             },
             "fp16": {
@@ -835,12 +834,10 @@ def test_zero3_param_partitioning_large_param(world_sz: int,
     _distributed_test()
 
 
-# ASCEND AVOID
 @pytest.mark.parametrize("world_sz", [1, 2, 4])
 @pytest.mark.parametrize("param_sz", [100, 1_000, 10_000])
 @pytest.mark.parametrize("n_layers", [100, 1_000])
-# @pytest.mark.parametrize("init_context_manager", [True, False])
-@pytest.mark.parametrize("init_context_manager", [False])
+@pytest.mark.parametrize("init_context_manager", [True, False])
 def test_zero3_param_partitioning_many_params(world_sz: int,
                                               param_sz: int,
                                               n_layers: int,

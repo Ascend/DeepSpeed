@@ -259,7 +259,8 @@ def get_all_subclasses(cls):
 def free_param(param: Parameter) -> None:
     """Free underlying storage of a parameter."""
     assert not param.ds_active_sub_modules, param.ds_summary()
-    if param.data.is_cuda:
+    # ASCEND AVOID
+    if param.data.is_npu:
         # need to make sure that we don't free the parameter while it is still
         # being used for computation
         param.data.record_stream(torch.npu.current_stream())
@@ -760,8 +761,8 @@ class Init(InsertPostInitMethodToModuleSubClasses):
                 print_rank_0(
                     f"Partitioning param {debug_param2name_id_shape(param)} module={debug_module2name(module)}"
                 )
-
-                if param.is_cuda:
+                # ASCEND AVOID
+                if param.is_npu:
                     torch.distributed.broadcast(param, 0, self.ds_process_group)
                 else:
                     if torch.distributed.get_rank() == 0:
