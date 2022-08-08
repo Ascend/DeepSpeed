@@ -782,11 +782,15 @@ class DeepSpeedZeroOptimizer_Stage3(object):
         self.__param_id_to_grad_partition: Dict[int, Tensor] = {}
 
         all_params = list(itertools.chain.from_iterable(self.fp16_groups))
-
+        # ASCEND AVOID
+        # grad_partitions_flat_buffer: Tensor = torch.zeros(
+        #     sum(p.ds_tensor.ds_numel for p in all_params),
+        #     dtype=self.dtype,
+        #     pin_memory=self.offload_optimizer_pin_memory).\
+        #     to(self.device)
         grad_partitions_flat_buffer: Tensor = torch.zeros(
             sum(p.ds_tensor.ds_numel for p in all_params),
-            dtype=self.dtype,
-            pin_memory=self.offload_optimizer_pin_memory).\
+            dtype=self.dtype).\
             to(self.device)
 
         offset = 0
@@ -1831,6 +1835,10 @@ class DeepSpeedZeroOptimizer_Stage3(object):
                 new_grad_tensor.copy_(param.grad, non_blocking=True)
                 param.grad.record_stream(torch.npu.current_stream())
                 param.grad.data = new_grad_tensor
+
+
+        # ASCEND AVOID, add sync to avoid number error
+        torch.npu.synchronize()
 
         self.__params_in_ipg_bucket.append(param)
 
