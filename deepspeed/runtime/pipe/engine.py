@@ -10,6 +10,7 @@ from types import MethodType
 from numpy import prod
 
 import torch
+from torch_npu.npu import clear_npu_overflow_flag
 import torch.nn as nn
 import torch.optim as optim
 import torch.distributed as dist
@@ -56,7 +57,7 @@ class PipelineEngine(DeepSpeedEngine):
         torch.complex128,
         torch.float16,
         torch.bfloat16,
-        torch.uint8,
+        # torch.uint8,
         torch.int8,
         torch.int16,
         torch.int32,
@@ -141,8 +142,8 @@ class PipelineEngine(DeepSpeedEngine):
                 if self.global_rank != min(d['ranks']):
                     tied_params += sum(p.numel() for p in d['module'].parameters())
             unique_params -= tied_params
-        params_tensor = torch.LongTensor(data=[num_params,
-                                               unique_params]).to(self.device)
+        params_tensor = torch.IntTensor(data=[num_params, unique_params]).to(self.device)
+
         dist.all_reduce(params_tensor, group=self.grid.get_model_parallel_group())
         params_tensor = params_tensor.tolist()
         total_params = params_tensor[0]
@@ -684,7 +685,7 @@ class PipelineEngine(DeepSpeedEngine):
                                            "init in order to use backward"
 
         self.mem_status('BEFORE BWD', reset_max=True)
-
+        clear_npu_overflow_flag()
         # The last stage just runs backward on the loss using DeepSpeed's typical
         # mechanisms.
         if self.is_last_stage():
@@ -759,7 +760,7 @@ class PipelineEngine(DeepSpeedEngine):
                 loaded = batch[0].clone().to(self.device).detach()
                 loaded.requires_grad = loaded.is_floating_point()
             else:
-                assert isinstance(batch[0], tuple)
+                assert isinstance(batch[0], tuple) or isinstance(batch[0], list)
                 # Assume list or tuple
                 loaded = []
                 for x in batch[0]:
@@ -800,36 +801,36 @@ class PipelineEngine(DeepSpeedEngine):
         """
         send_bytes = 0
         if isinstance(buffer, torch.Tensor):
-            type_tensor = torch.LongTensor(data=[0]).to(self.device)
+            type_tensor = torch.IntTensor(data=[0]).to(self.device)
             p2p.send(type_tensor, recv_stage)
-            send_shape = torch.LongTensor(data=buffer.size()).to(self.device)
-            send_ndims = torch.LongTensor(data=[len(buffer.size())]).to(self.device)
+            send_shape = torch.IntTensor(data=buffer.size()).to(self.device)
+            send_ndims = torch.IntTensor(data=[len(buffer.size())]).to(self.device)
             p2p.send(send_ndims, recv_stage)
             p2p.send(send_shape, recv_stage)
             send_bytes += _tensor_bytes(buffer)
         elif isinstance(buffer, list):
             assert (False)
-            type_tensor = torch.LongTensor(data=[1]).to(self.device)
+            type_tensor = torch.IntTensor(data=[1]).to(self.device)
             p2p.send(type_tensor, recv_stage)
-            count_tensor = torch.LongTensor(data=[len(buffer)]).to(self.device)
+            count_tensor = torch.IntTensor(data=[len(buffer)]).to(self.device)
             p2p.send(count_tensor, recv_stage)
             for tensor in buffer:
                 assert isinstance(tensor, torch.Tensor)
-                send_shape = torch.LongTensor(data=tensor.size()).to(self.device)
-                send_ndims = torch.LongTensor(data=[len(tensor.size())]).to(self.device)
+                send_shape = torch.IntTensor(data=tensor.size()).to(self.device)
+                send_ndims = torch.IntTensor(data=[len(tensor.size())]).to(self.device)
                 p2p.send(send_ndims, recv_stage)
                 p2p.send(send_shape, recv_stage)
                 send_bytes += _tensor_bytes(tensor)
         elif isinstance(buffer, tuple):
-            type_tensor = torch.LongTensor(data=[2]).to(self.device)
+            type_tensor = torch.IntTensor(data=[2]).to(self.device)
             p2p.send(type_tensor, recv_stage)
-            count_tensor = torch.LongTensor(data=[len(buffer)]).to(self.device)
+            count_tensor = torch.IntTensor(data=[len(buffer)]).to(self.device)
             p2p.send(count_tensor, recv_stage)
             for idx, tensor in enumerate(buffer):
                 assert isinstance(tensor, torch.Tensor)
-                send_shape = torch.LongTensor(data=tensor.size()).to(self.device)
-                send_ndims = torch.LongTensor(data=[len(tensor.size())]).to(self.device)
-                send_dtype = torch.LongTensor(data=[self.DTYPE_TO_ID[tensor.dtype]]).to(
+                send_shape = torch.IntTensor(data=tensor.size()).to(self.device)
+                send_ndims = torch.IntTensor(data=[len(tensor.size())]).to(self.device)
+                send_dtype = torch.IntTensor(data=[self.DTYPE_TO_ID[tensor.dtype]]).to(
                     self.device)
                 p2p.send(send_dtype, recv_stage)
                 p2p.send(send_ndims, recv_stage)
@@ -867,34 +868,34 @@ class PipelineEngine(DeepSpeedEngine):
             Allocated buffer for receiving from send_stage.
         """
 
-        type_tensor = torch.LongTensor(data=[0]).to(self.device)
+        type_tensor = torch.IntTensor(data=[0]).to(self.device)
         p2p.recv(type_tensor, send_stage)
         recv_type = type_tensor.item()
 
         # A single tensor will be sent.
         if recv_type == 0:
-            recv_ndims = torch.LongTensor(data=[0]).to(self.device)
+            recv_ndims = torch.IntTensor(data=[0]).to(self.device)
             p2p.recv(recv_ndims, send_stage)
             recv_ndims = recv_ndims.item()
-            recv_shape = torch.LongTensor([1] * recv_ndims).to(self.device)
+            recv_shape = torch.IntTensor([1] * recv_ndims).to(self.device)
             p2p.recv(recv_shape, send_stage)
             recv_shape = recv_shape.tolist()
             return self._allocate_buffer(recv_shape, num_buffers=1)[0]
 
         # List or tuple of tensors
         elif recv_type == 1 or recv_type == 2:
-            count_tensor = torch.LongTensor(data=[0]).to(self.device)
+            count_tensor = torch.IntTensor(data=[0]).to(self.device)
             p2p.recv(count_tensor, send_stage)
             num_tensors = count_tensor.item()
             recv_shapes_and_dtypes = []
             for idx in range(num_tensors):
-                recv_dtype = torch.LongTensor(data=[0]).to(self.device)
+                recv_dtype = torch.IntTensor(data=[0]).to(self.device)
                 p2p.recv(recv_dtype, send_stage)
                 recv_dtype = self.ID_TO_DTYPE[recv_dtype.item()]
-                recv_ndims = torch.LongTensor(data=[0]).to(self.device)
+                recv_ndims = torch.IntTensor(data=[0]).to(self.device)
                 p2p.recv(recv_ndims, send_stage)
                 recv_ndims = recv_ndims.item()
-                recv_shape = torch.LongTensor([1] * recv_ndims).to(self.device)
+                recv_shape = torch.IntTensor([1] * recv_ndims).to(self.device)
                 p2p.recv(recv_shape, send_stage)
                 recv_shapes_and_dtypes.append((recv_shape.tolist(), recv_dtype))
 
@@ -1022,10 +1023,10 @@ class PipelineEngine(DeepSpeedEngine):
             for idx, buffer in enumerate(self.pipe_recv_buf):
                 assert torch.is_tensor(buffer)
                 # XXX hardcode meta type
-                if self.is_pipe_partitioned and idx == 0 and buffer.dtype != torch.long:
+                if self.is_pipe_partitioned and idx == 0 and buffer.dtype != torch.int:
                     if self.meta_buffer is None:
                         self.meta_buffer = torch.zeros(buffer.size(),
-                                                       dtype=torch.long,
+                                                       dtype=torch.int,
                                                        device=self.device)
                     buffer = self.meta_buffer
 
@@ -1105,9 +1106,9 @@ class PipelineEngine(DeepSpeedEngine):
             assert isinstance(outputs, tuple)
             for idx, buffer in enumerate(self.grad_layer):
                 # XXX GPT-2 hack
-                if self.is_grad_partitioned and idx == 0 and buffer.dtype != torch.long:
+                if self.is_grad_partitioned and idx == 0 and buffer.dtype != torch.int:
                     buffer.data = torch.zeros(buffer.size(),
-                                              dtype=torch.long,
+                                              dtype=torch.int,
                                               device=self.device)
                 p2p.recv(buffer, self.next_stage)
 
@@ -1237,14 +1238,14 @@ class PipelineEngine(DeepSpeedEngine):
         if print_rank != -1 and rank != print_rank:
             return
 
-        torch.cuda.synchronize()
+        torch.npu.synchronize()
 
         if reset_max:
-            torch.cuda.reset_max_memory_cached()
-            torch.cuda.reset_max_memory_allocated()
+            torch.npu.reset_max_memory_cached()
+            torch.npu.reset_max_memory_allocated()
 
-        new_alloced = torch.cuda.memory_allocated()
-        new_cached = torch.cuda.memory_cached()
+        new_alloced = torch.npu.memory_allocated()
+        new_cached = torch.npu.memory_cached()
 
         delta_alloced = new_alloced - mem_alloced
         delta_cached = new_cached - mem_cached
@@ -1252,8 +1253,8 @@ class PipelineEngine(DeepSpeedEngine):
         mem_cached = new_cached
         mem_alloced = new_alloced
 
-        max_alloced = torch.cuda.max_memory_allocated()
-        max_cached = torch.cuda.max_memory_cached()
+        max_alloced = torch.npu.max_memory_allocated()
+        max_cached = torch.npu.max_memory_cached()
 
         # convert to GB for printing
         new_alloced /= 1024**3

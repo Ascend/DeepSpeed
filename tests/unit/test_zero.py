@@ -166,7 +166,9 @@ def test_zero_to_fp32_1_param_group(tmpdir, zero_stage):
         "optimizer": {
             "type": "Adam",
             "params": {
-                "lr": 1e-3
+                "lr": 1e-3,
+                # ASCEND AVOID
+                "torch_adam": True
             }
         },
         "fp16": {
@@ -266,7 +268,8 @@ def test_zero_to_fp32_2_param_groups(tmpdir, zero_stage):
         "optimizer": {
             "type": "Adam",
             "params": {
-                "lr": 1e-3
+                "lr": 1e-3,
+                "torch_adam": True
             }
         },
         "fp16": {
@@ -367,7 +370,8 @@ def test_incorrect_allgather_bucket_size(tmpdir, zero_stage, allgather_bucket_si
         "optimizer": {
             "type": "Adam",
             "params": {
-                "lr": 1e-3
+                "lr": 1e-3,
+                "torch_adam": True
             }
         },
         "fp16": {
@@ -537,11 +541,12 @@ class EltwiseMultiplicationTestNetwork(Module):
             "loss": loss,
         }
 
-
+# ASCEND AVOID
 @pytest.mark.parametrize("param_persistence_threshold", [0, 10])
 @pytest.mark.parametrize("fp16_enabled", [True, False])
 @pytest.mark.parametrize("contiguous_gradients", [True, False])
-@pytest.mark.parametrize("offload_optimizer", [True, False])
+# @pytest.mark.parametrize("offload_optimizer", [True, False])
+@pytest.mark.parametrize("offload_optimizer", [False])
 @pytest.mark.parametrize("zero_grad", [True, False])
 @pytest.mark.parametrize("iteration", list(range(1)))
 def test_zero3_param_partitioning_base(
@@ -573,7 +578,8 @@ def test_zero3_param_partitioning_base(
             "optimizer": {
                 "type": "Adam",
                 "params": {
-                    "lr": 1.
+                    "lr": 1.,
+                    "torch_adam": True
                 }
             },
             "fp16": {
@@ -596,8 +602,7 @@ def test_zero3_param_partitioning_base(
         def create_tensor(vals, dtype: torch.dtype = None) -> Tensor:
             return torch.as_tensor(vals,
                                    dtype=dtype
-                                   or (torch.float16 if fp16_enabled else torch.float32),
-                                   device=ds_engine.device)
+                                   or (torch.float16 if fp16_enabled else torch.float32)).to(ds_engine.device)
 
         expected_hidden1 = create_tensor([
             [1,
@@ -707,30 +712,30 @@ def test_zero3_param_partitioning_base(
             grad_multiplier = 1 if zero_grad else (train_iter + 1)
             if dist.get_rank() == 0:
                 assert torch.allclose(
-                    dloss_wrt_layer3.cuda(),
+                    dloss_wrt_layer3.npu(),
                     grad_multiplier * create_tensor([2] * 8,
                                                     torch.float))
                 assert torch.allclose(
-                    dloss_wrt_layer2.cuda(),
+                    dloss_wrt_layer2.npu(),
                     grad_multiplier * create_tensor([3 * 1] * 8,
                                                     torch.float))
                 assert torch.allclose(
-                    dloss_wrt_layer1.cuda(),
+                    dloss_wrt_layer1.npu(),
                     grad_multiplier * create_tensor([3 * 2 * 1] * 8,
                                                     torch.float))
             elif dist.get_rank() == 1:
                 # parameters dont split evenly across ranks so rank 1 has a zero-padded
                 # partition
                 assert torch.allclose(
-                    dloss_wrt_layer3.cuda(),
+                    dloss_wrt_layer3.npu(),
                     grad_multiplier * create_tensor(([8] * 7) + [0],
                                                     torch.float))
                 assert torch.allclose(
-                    dloss_wrt_layer2.cuda(),
+                    dloss_wrt_layer2.npu(),
                     grad_multiplier * create_tensor(([6 * 2] * 7) + [0],
                                                     torch.float))
                 assert torch.allclose(
-                    dloss_wrt_layer1.cuda(),
+                    dloss_wrt_layer1.npu(),
                     grad_multiplier * create_tensor(([6 * 4 * 1] * 7) + [0],
                                                     torch.float))
             else:
@@ -749,7 +754,6 @@ def test_zero3_param_partitioning_base(
 
     _test_zero3_param_partitioning()
 
-
 @pytest.mark.parametrize("world_sz", [1, 2, 4])
 @pytest.mark.parametrize("param_sz", [8100])
 @pytest.mark.parametrize("init_context_manager", [True, False])
@@ -760,7 +764,6 @@ def test_zero3_param_partitioning_large_param(world_sz: int,
         def __init__(self):
             super().__init__()
             self.param = Parameter(torch.zeros((param_sz, ), dtype=torch.float32))
-
             # only do weight initialization on root rank to
             # make sure we are broadcasting correctly from rank 0
             if dist.get_rank() == 0:
@@ -787,7 +790,8 @@ def test_zero3_param_partitioning_large_param(world_sz: int,
             "optimizer": {
                 "type": "Adam",
                 "params": {
-                    "lr": 1.
+                    "lr": 1.,
+                    "torch_adam": True
                 }
             },
             "fp16": {

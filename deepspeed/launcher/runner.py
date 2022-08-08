@@ -15,7 +15,9 @@ import subprocess
 import collections
 from copy import deepcopy
 
-import torch.cuda
+# import torch.cuda
+import torch
+import torch_npu
 
 from .multinode_runner import PDSHRunner, OpenMPIRunner, MVAPICHRunner
 from .constants import PDSH_LAUNCHER, OPENMPI_LAUNCHER, MVAPICH_LAUNCHER
