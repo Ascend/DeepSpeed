@@ -88,7 +88,11 @@ class _AllToAll(torch.autograd.Function):
                 input: Tensor) -> Tensor:  # type: ignore
         ctx.group = group
         # ASCEND AVOID
-        input = input.contiguous().npu_format_cast(2)
+        input = input.contiguous()
+        if input.dim() == 4:
+            input = input.npu_format_cast(0)
+        else:
+            input = input.npu_format_cast(2)
         output = torch.empty_like(input)
         dist.all_to_all_single(output, input, group=group)
         return output
