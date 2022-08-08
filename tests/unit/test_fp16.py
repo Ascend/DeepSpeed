@@ -248,6 +248,9 @@ def test_unfused_fp16_optimizer_gradnorm_for_moe(tmpdir, monkeypatch):
 
 
 def test_fused_fp16_optimizer_gradnorm_for_moe(tmpdir, monkeypatch):
+    # ASCEND AVOID OPT
+    pytest.skip("FusedAdam is not supported")
+
     if not required_torch_version():
         pytest.skip("DeepSpeed MoE tests need torch 1.8 or higher to run correctly")
 
@@ -275,8 +278,7 @@ def test_fused_fp16_optimizer_gradnorm_for_moe(tmpdir, monkeypatch):
         # initialize MoE
         model = SimpleMoEModel(hidden_dim, ep_size=2)
         # optimizer = torch.optim.AdamW(params=model.parameters())
-        # ASCEND AVOID OPT
-        optimizer = torch.optim.Adam(params=model.parameters())
+        optimizer = FusedAdam(params=model.parameters())
         engine, optimizer, _, _ = deepspeed.initialize(args=args,
                                               model=model,
                                               optimizer=optimizer,
