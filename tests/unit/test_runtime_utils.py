@@ -51,6 +51,10 @@ def test_clip_grad_norm_():
 
 @pytest.mark.parametrize("check_using_norm", [(False), (True)])
 def test_CheckOverflow(check_using_norm):
+    # ASCEND AVOID OPT
+    if not check_using_norm:
+        pytest.skip("check using norm[False] is not supported")
+
     @distributed_test(world_size=[2])
     def _test_CheckOverflow(check_using_norm: bool):
         groups._create_expert_and_data_parallel(2)
