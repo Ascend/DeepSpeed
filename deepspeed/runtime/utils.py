@@ -262,6 +262,9 @@ class CheckOverflow(object):
             torch.distributed.all_reduce(overflow_npu,
                                          op=torch.distributed.ReduceOp.MAX,
                                          group=torch.distributed.group.WORLD)
+        else:
+            torch.distributed.all_reduce(overflow_npu, op=torch.distributed.ReduceOp.MAX,
+                                         group=torch.distributed.group.WORLD)
 
         overflow = overflow_npu[0].item()
         return bool(overflow)

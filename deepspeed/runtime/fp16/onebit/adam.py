@@ -56,7 +56,7 @@ class OnebitAdam(torch.optim.Optimizer):
                  max_grad_norm=0.,
                  amsgrad=False,
                  cuda_aware=False,
-                 comm_backend_name='nccl'):
+                 comm_backend_name='hccl'):
 
         if amsgrad:
             raise RuntimeError('1-bit Adam does not support the AMSGrad variant.')
@@ -102,6 +102,13 @@ class OnebitAdam(torch.optim.Optimizer):
         elif self.comm_backend_name == 'mpi':
             from deepspeed.runtime.comm.mpi import MpiBackend
             self.comm_backend_handle = MpiBackend(cuda_aware)
+
+        elif self.comm_backend_name == 'hccl':
+            assert dist.is_initialized() == True, "Please initialize the torch distributed backend."
+            from deepspeed.runtime.comm.hccl import HcclBackend
+            self.using_pipeline = hasattr(self.deepspeed, 'pipeline_enable_backward_allreduce')
+            self.comm_backend_handle = HcclBackend(self.deepspeed.mpu)
+
 
         self.size = self.comm_backend_handle.size
 
@@ -179,12 +186,12 @@ class OnebitAdam(torch.optim.Optimizer):
 
                 if not self.initialize or (self.adam_freeze_key
                                            and 'worker_error' not in state.keys()):
-                    torch.cuda.empty_cache()
+                    torch.npu.empty_cache()
                     state['worker_error'] = torch.zeros(state['corrected_tensor_size'],
                                                         device=p.device)
                     state['server_error'] = torch.zeros(state['server_chunk_size'],
                                                         device=p.device)
-                    torch.cuda.empty_cache()
+                    torch.npu.empty_cache()
                     self.adam_freeze_key = True
                     if not self.initialize and torch.distributed.get_rank() == 0:
                         print("Cupy Buffers Initialized Successfully.")

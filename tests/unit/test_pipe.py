@@ -2,6 +2,7 @@ import os
 import copy
 
 import torch
+import torch_npu
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.distributed as dist
@@ -123,7 +124,7 @@ def cifar_trainset(fp16=False):
 
     transform = transforms.Compose(transform_list)
 
-    local_rank = torch.cuda.current_device()
+    local_rank = torch.npu.current_device()
 
     # Only one rank per machine downloads.
     dist.barrier()
@@ -139,38 +140,38 @@ def cifar_trainset(fp16=False):
 
 
 def train_cifar(model, args, num_steps=400, average_dp_losses=True, fp16=True, seed=123):
-    with torch.random.fork_rng(devices=[torch.cuda.current_device()]):
-        ds_utils.set_random_seed(seed)
+    # with torch.random.fork_rng(devices=[torch.npu.current_device()]):
+    ds_utils.set_random_seed(seed)
 
-        # disable dropout
-        model.eval()
+    # disable dropout
+    model.eval()
 
-        trainset = cifar_trainset(fp16=fp16)
-        args.local_rank = dist.get_rank()
+    trainset = cifar_trainset(fp16=fp16)
+    args.local_rank = dist.get_rank()
 
-        engine, _, _, _ = deepspeed.initialize(
-            args=args,
-            model=model,
-            model_parameters=[p for p in model.parameters()],
-            training_data=trainset)
+    engine, _, _, _ = deepspeed.initialize(
+        args=args,
+        model=model,
+        model_parameters=[p for p in model.parameters()],
+        training_data=trainset)
 
-        losses = []
-        for step in range(num_steps):
-            loss = engine.train_batch()
-            losses.append(loss.item())
-            if step % 50 == 0 and dist.get_rank() == 0:
-                print(f'STEP={step} LOSS={loss.item()}')
+    losses = []
+    for step in range(num_steps):
+        loss = engine.train_batch()
+        losses.append(loss.item())
+        if step % 50 == 0 and dist.get_rank() == 0:
+            print(f'STEP={step} LOSS={loss.item()}')
 
-        if average_dp_losses:
-            loss_tensor = torch.tensor(losses).cuda()
-            dist.all_reduce(loss_tensor)
-            loss_tensor /= dist.get_world_size()
-            losses = loss_tensor.tolist()
+    if average_dp_losses:
+        loss_tensor = torch.tensor(losses).npu()
+        dist.all_reduce(loss_tensor)
+        loss_tensor /= dist.get_world_size()
+        losses = loss_tensor.tolist()
 
     return losses
 
 
-@pytest.mark.skip(reason="been seeing nondeterministic failures, skipping for now")
+# @pytest.mark.skip(reason="been seeing nondeterministic failures, skipping for now")
 @pytest.mark.parametrize('topo',
                          [
                              PipeTopo(num_pp=1,
@@ -203,7 +204,7 @@ def test_pipe_cifar10(topo, tmpdir):
         },
         "pipeline": {
             "seed_layers": True,
-            "activation_checkpoint_interval": 1
+            "activation_checkpoint_interval": 0
         }
     }
     args = args_from_dict(tmpdir, config_dict)
