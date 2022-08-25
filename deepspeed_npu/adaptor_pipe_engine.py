@@ -4,6 +4,7 @@ from deepspeed.runtime.pipe import engine
 from deepspeed.runtime.pipe.engine import _tensor_bytes, PipelineEngine
 from deepspeed.runtime.pipe import p2p
 from deepspeed.runtime.utils import PartitionedTensor
+
 class PipelineEngineNew(PipelineEngine):
     ID_TO_DTYPE = [
         torch.float32,

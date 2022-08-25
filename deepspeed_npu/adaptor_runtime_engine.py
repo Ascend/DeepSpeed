@@ -143,5 +143,5 @@ def _checkpoint_tag_validation(self, tag):
         elif not valid:
             logger.warning(msg)
 
-engine._configure_basic_optimizer = _configure_basic_optimizer
-engine._checkpoint_tag_validation = _checkpoint_tag_validation
+engine.DeepSpeedEngine._configure_basic_optimizer = _configure_basic_optimizer
+engine.DeepSpeedEngine._checkpoint_tag_validation = _checkpoint_tag_validation

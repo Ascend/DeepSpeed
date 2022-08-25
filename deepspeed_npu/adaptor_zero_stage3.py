@@ -46,7 +46,7 @@ class DeepSpeedZeroOptimizer_Stage3Npu(DeepSpeedZeroOptimizer_Stage3):
 
         return total_norm
 
-    def __partition_grads(self,
+    def _DeepSpeedZeroOptimizer_Stage3__partition_grads(self,
                           params_to_release: List[Parameter],
                           grad_partitions: List[Tensor]) -> None:
         grad_buffer_lst = []

@@ -1,9 +1,10 @@
+import sys
 import torch
 import torch_npu
 from deepspeed.runtime.pipe.module import PipelineModule
-from deepspeed.runtime.utils import ds_utils
+import deepspeed.runtime.utils as ds_utils
 from deepspeed.utils import logger
-class PipelineModuleNew(PipelineModule):
+class PipelineModuleNpu(PipelineModule):
     def _index_tied_modules(self):
         torch.npu.set_device(self.local_rank)
         self.to(f'npu:{self.local_rank}')
@@ -57,5 +58,7 @@ class PipelineModuleNew(PipelineModule):
 
             self.parts = partition(param_counts, num_stages)
 
-PipelineModule = PipelineModuleNew
+for k, v in sys.modules.items():
+    if 'deepspeed' in k and hasattr(v, 'PipelineModule'):
+        setattr(v, 'PipelineModule', PipelineModuleNpu)
         
