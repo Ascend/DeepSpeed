@@ -1,7 +1,7 @@
 import torch
 import torch_npu
 from torch_npu.contrib import transfer_to_npu
-from . import adaptor_utils_nvtx
+from . import adaptor_utils
 from . import adaptor_moe_shared_moe
 from . import adaptor_pipe_engine
 from . import adaptor_pipe_module
