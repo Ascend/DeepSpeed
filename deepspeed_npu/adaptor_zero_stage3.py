@@ -1,5 +1,15 @@
-from deepspeed.runtime.zero.stage3 import ZeROOrderedDict
-class ZeROOrderedDictNew(ZeROOrderedDict):
+from typing import Deque, Dict, Iterable, Set, Tuple, List
+import sys
+import torch
+from torch import Tensor
+from torch._six import inf
+from torch.nn import Parameter
+import torch.distributed as dist
+from deepspeed.runtime.utils import is_model_parallel_parameter
+from deepspeed.runtime.zero.stage3 import DeepSpeedZeroOptimizer_Stage3
+
+
+class DeepSpeedZeroOptimizer_Stage3Npu(DeepSpeedZeroOptimizer_Stage3):
     def complete_grad_norm_calculation_for_cpu_offload(self, params):
         total_norm = 0.0
         norm_type = 2.0
@@ -47,7 +57,7 @@ class ZeROOrderedDictNew(ZeROOrderedDict):
                 continue
 
             # move or accumulate gradient partition to target buffer
-            grad_buffer = self.__param_id_to_grad_partition[param.ds_id].narrow(
+            grad_buffer = self._DeepSpeedZeroOptimizer_Stage3__param_id_to_grad_partition[param.ds_id].narrow(
                 0,
                 0,
                 grad_partition.numel())
@@ -112,7 +122,7 @@ class ZeROOrderedDictNew(ZeROOrderedDict):
             param.grad = None
 
         overflow_npu = torch._amp_foreach_non_finite_check_(grad_buffer_lst)
-        self.__inf_or_nan_tracker = torch.BoolTensor([overflow_npu]).to(torch.npu.current_device())
+        self._DeepSpeedZeroOptimizer_Stage3__inf_or_nan_tracker = torch.BoolTensor([overflow_npu]).to(torch.npu.current_device())
 
         if self.offload_optimizer and self.swap_optimizer:
             for i in offload_fp32_gradients.keys():
@@ -196,12 +206,11 @@ class ZeROOrderedDictNew(ZeROOrderedDict):
                     grads.append(grad.data)
         return torch._amp_foreach_non_finite_check_(grads)
 
-    @instrument_w_nvtx
     def has_overflow(self, partition_gradients=True):
         if partition_gradients:
-            with torch.npu.stream(self.__reduce_and_partition_stream):
-                self.local_overflow = bool(self.__inf_or_nan_tracker.item())
-                self.__inf_or_nan_tracker.zero_()
+            with torch.npu.stream(self._DeepSpeedZeroOptimizer_Stage3__reduce_and_partition_stream):
+                self.local_overflow = bool(self._DeepSpeedZeroOptimizer_Stage3__inf_or_nan_tracker.item())
+                self._DeepSpeedZeroOptimizer_Stage3__inf_or_nan_tracker.zero_()
 
             overflow = self.local_overflow
             #overflow = self.has_overflow_partitioned_grads_serial()
@@ -226,4 +235,6 @@ class ZeROOrderedDictNew(ZeROOrderedDict):
         overflow = overflow_npu[0].item()
         return bool(overflow)
 
-ZeROOrderedDict = ZeROOrderedDictNew
+for k, v in sys.modules.items():
+    if 'deepspeed' in k and hasattr(v, 'DeepSpeedZeroOptimizer_Stage3'):
+        setattr(v, 'DeepSpeedZeroOptimizer_Stage3', DeepSpeedZeroOptimizer_Stage3Npu)

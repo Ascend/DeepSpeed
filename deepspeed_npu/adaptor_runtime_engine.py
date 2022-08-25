@@ -1,6 +1,31 @@
+import hashlib
+import torch
+import torch.distributed as dist
 from deepspeed.runtime import engine
 from deepspeed.utils import logger
-import hashlib
+from deepspeed.runtime.config import DeepSpeedConfig, DEEPSPEED_OPTIMIZERS, \
+    ADAGRAD_OPTIMIZER, ADAM_OPTIMIZER, ADAMW_OPTIMIZER, LAMB_OPTIMIZER, ONEBIT_ADAM_OPTIMIZER, ONEBIT_LAMB_OPTIMIZER, \
+    TORCH_ADAM_PARAM, ADAM_W_MODE, ADAM_W_MODE_DEFAULT
+
+
+def split_half_float_double_sparse(tensors):
+    supported_types = [
+        "torch.npu.HalfTensor",
+        "torch.npu.FloatTensor"
+    ]
+
+    for t in tensors:
+        assert t.type() in supported_types, f"attempting to reduce an unsupported grad type: {t.type()}"
+
+    buckets = []
+    for i, dtype in enumerate(supported_types):
+        bucket = [t for t in tensors if t.type() == dtype]
+        if bucket:
+            buckets.append((dtype, bucket))
+    return buckets
+
+engine.split_half_float_double_sparse = split_half_float_double_sparse
+
 def _configure_basic_optimizer(self, model_parameters):
     optimizer_parameters = self.optimizer_params()
     if optimizer_parameters is None:

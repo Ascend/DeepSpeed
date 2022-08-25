@@ -1,5 +1,12 @@
+import sys
 import torch
+import torch.distributed as dist
+from torch._six import inf
 from deepspeed.runtime import utils
+from deepspeed.runtime import bwc_tensor_model_parallel_rank
+from deepspeed.utils import groups
+from deepspeed.runtime.utils import is_model_parallel_parameter
+
 def check_using_norm(self, norm_group, reduce_overflow=True):
     # TODO: I don't think reduce_overflow is needed if mpu is None
     overflow = -1 in norm_group
@@ -208,6 +215,10 @@ def get_weight_norm(parameters, norm_type=2, mpu=None):
 
     return total_norm
 
+for k, v in sys.modules.items():
+    if 'deepspeed' in k and hasattr(v, 'get_grad_norm'):
+        setattr(v, 'get_grad_norm', get_grad_norm)
 
-utils.get_grad_norm = get_grad_norm
-utils.get_weight_norm = get_weight_norm
+for k, v in sys.modules.items():
+    if 'deepspeed' in k and hasattr(v, 'get_weight_norm'):
+        setattr(v, 'get_weight_norm', get_weight_norm)

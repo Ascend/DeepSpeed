@@ -1,4 +1,5 @@
 import torch
+from torch import Tensor
 from deepspeed.runtime.zero import partition_parameters
 from deepspeed.utils import instrument_w_nvtx
 def torch_allgather_fn(input_tensor: Tensor, output_tensor: Tensor, group):

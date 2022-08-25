@@ -1,3 +1,5 @@
+import torch
+from torch import Tensor
 from deepspeed.runtime.comm import coalesced_collectives
 
 def torch_reduce_scatter_fn(input_tensor: Tensor, output_tensor: Tensor, group):
@@ -7,7 +9,7 @@ def torch_reduce_scatter_fn(input_tensor: Tensor, output_tensor: Tensor, group):
     # ASCEND AVOID
     new_input_tensor_lst = [x.clone() for x in input_tensor_lst]
     new_output_tensor = output_tensor.clone()
-    instrument_w_nvtx(torch.distributed.reduce_scatter)(
+    torch.distributed.reduce_scatter(
         new_output_tensor,
         new_input_tensor_lst,
         group=group,

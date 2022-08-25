@@ -1,4 +1,5 @@
 import torch
+from torch_npu.npu import clear_npu_overflow_flag
 from deepspeed.runtime.pipe import engine
 from deepspeed.runtime.pipe.engine import _tensor_bytes, PipelineEngine
 from deepspeed.runtime.pipe import p2p

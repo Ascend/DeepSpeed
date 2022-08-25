@@ -1,12 +1,10 @@
 from functools import wraps
+import sys
 import torch
 from torch import Tensor
 import torch.distributed as dist
-from typing import Callable, Dict, TYPE_CHECKING, Any, Optional, Tuple, Union, cast
-
-
+from typing import Any, Tuple, cast
 from deepspeed.moe import sharded_moe
-from typing import Callable, Dict, TYPE_CHECKING, Any, Optional, Tuple, Union, cast
 
 class _AllToAll(torch.autograd.Function):
     @staticmethod
@@ -29,6 +27,9 @@ class _AllToAll(torch.autograd.Function):
         return (None, _AllToAll.apply(ctx.group, *grad_output))
 
 sharded_moe._ALLToALL = _AllToAll
+for k, v in sys.modules.items():
+    if 'deepspeed' in k and hasattr(v, '_AllToAll'):
+        setattr(v, '_AllToAll', _AllToAll)
 
 def warning_once(fn):
     fn.warned = False
@@ -51,7 +52,7 @@ torch.jit.script = empty_jit_wrapper
 def one_hot_wrapper(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
-        return fn(args[0].int(), args[1])
+        return fn(*args, **kwargs)
     return wrapper
 
 torch.nn.functional.one_hot = one_hot_wrapper(torch.nn.functional.one_hot)

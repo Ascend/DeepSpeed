@@ -1,7 +1,7 @@
 from torch_npu.npu import clear_npu_overflow_flag
 from deepspeed.runtime.fp16 import fused_optimizer
 # fused_optimizer============
-def fused_optimizer_backward(self, loss, create_graph=False, retain_graph=False):
+def backward(self, loss, create_graph=False, retain_graph=False):
     """
     :attr:`backward` performs the following steps:
 
@@ -14,4 +14,4 @@ def fused_optimizer_backward(self, loss, create_graph=False, retain_graph=False)
 
     scaled_loss.backward(create_graph=create_graph, retain_graph=retain_graph)
 
-fused_optimizer.FP16_Optimizer.backward = fused_optimizer_backward
+fused_optimizer.FP16_Optimizer.backward = backward

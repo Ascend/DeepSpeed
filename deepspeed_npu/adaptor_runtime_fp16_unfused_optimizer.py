@@ -1,3 +1,4 @@
+import sys
 from torch_npu.npu import clear_npu_overflow_flag
 from deepspeed.runtime.fp16 import unfused_optimizer
 
@@ -22,7 +23,11 @@ class FP16_UnfusedOptimizer_new(unfused_optimizer.FP16_UnfusedOptimizer):
                  mpu,
                  clip_grad,
                  fused_lamb_legacy)
+    
+    def step(self, closure=None):
         self.fused_lamb_legacy = False
+        super().step(closure)
+
     def backward(self, loss, create_graph=False, retain_graph=False):
         """
         :attr:`backward` performs the following steps:
@@ -37,3 +42,6 @@ class FP16_UnfusedOptimizer_new(unfused_optimizer.FP16_UnfusedOptimizer):
         scaled_loss.backward(create_graph=create_graph, retain_graph=retain_graph)
       
 unfused_optimizer.FP16_UnfusedOptimizer = FP16_UnfusedOptimizer_new
+for k, v in sys.modules.items():
+    if 'deepspeed' in k and hasattr(v, 'FP16_UnfusedOptimizer'):
+        setattr(v, 'FP16_UnfusedOptimizer', FP16_UnfusedOptimizer_new)
