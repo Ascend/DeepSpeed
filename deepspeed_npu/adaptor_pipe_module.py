@@ -1,7 +1,7 @@
 import sys
 import torch
 import torch_npu
-from deepspeed.runtime.pipe.module import PipelineModule
+from deepspeed.runtime.pipe.module import PipelineModule, LayerSpec
 import deepspeed.runtime.utils as ds_utils
 from deepspeed.utils import logger
 class PipelineModuleNpu(PipelineModule):
@@ -80,7 +80,7 @@ class PipelineModuleNpu(PipelineModule):
                     name = str(layer)
                     if isinstance(layer, LayerSpec):
                         name = layer.typename.__name__
-                    if isinstance(layer, nn.Module):
+                    if isinstance(layer, torch.nn.Module):
                         name = layer.__class__.__name__
                     else:
                         try:
