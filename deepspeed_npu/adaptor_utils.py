@@ -1,4 +1,5 @@
 from functools import wraps
+import copy
 import torch
 import torch.distributed as dist
 torch.cuda.nvtx = torch.ones
@@ -7,7 +8,8 @@ def wrapper_dist(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
         if args[0].dtype == torch.long:
-            new_args = [args[0].int()]
+            new_args = copy.deepcopy(list(args))
+            new_args[0] = new_args[0].int()
             fn(*new_args, **kwargs)
             args[0].copy_(new_args[0].long())
             return
