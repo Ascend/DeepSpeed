@@ -3,16 +3,18 @@ import torch
 import torch.distributed as dist
 torch.cuda.nvtx = torch.ones
 
-def wrapper_send_recv(fn):
+def wrapper_dist(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
-        new_args = list(args)
         if args[0].dtype == torch.long:
-            new_args[0] = torch.int
-        args = new_args
-        return fn(*args, **kwargs)
+            new_args = [args[0].int()]
+            fn(*new_args, **kwargs)
+            args[0].copy_(new_args[0].long())
+            return
+        fn(*args, **kwargs)
     
     return wrapper
 
-dist.send = wrapper_send_recv(dist.send)
-dist.recv = wrapper_send_recv(dist.recv)
+dist.send = wrapper_dist(dist.send)
+dist.recv = wrapper_dist(dist.recv)
+dist.all_reduce = wrapper_dist(dist.all_reduce)

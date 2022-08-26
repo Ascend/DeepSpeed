@@ -8,7 +8,7 @@ class PipelineModuleNpu(PipelineModule):
     def _index_tied_modules(self):
         torch.npu.set_device(self.local_rank)
         self.to(f'npu:{self.local_rank}')
-        super()._index_tied_modules()
+        return super()._index_tied_modules()
 
     def _partition_layers(self, method='uniform'):
         num_stages = self._topo.get_dim('pipe')
