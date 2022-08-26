@@ -5,7 +5,7 @@ from deepspeed.runtime.pipe.engine import _tensor_bytes, PipelineEngine
 from deepspeed.runtime.pipe import p2p
 from deepspeed.runtime.utils import PartitionedTensor
 
-class PipelineEngineNew(PipelineEngine):
+class PipelineEngineNPU(PipelineEngine):
     ID_TO_DTYPE = [
         torch.float32,
         torch.float64,
@@ -296,4 +296,4 @@ class PipelineEngineNew(PipelineEngine):
         if self.wall_clock_breakdown():
             self.timers('pipe_recv_grad').stop()
 
-engine.PipelineEngine = PipelineEngineNew
+engine.PipelineEngine = PipelineEngineNPU
