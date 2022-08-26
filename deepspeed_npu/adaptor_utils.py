@@ -21,8 +21,16 @@ def wrapper_dist(fn):
 def wrapper_dist_send(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
+        args = list(args)
         if args[0].dtype == torch.long:
             args[0] = args[0].int()
+        else:
+            if args[0].dim() == 4:
+                args[0] = args[0].npu_format_cast(0)
+            elif args[0].dim() == 5:
+                args[0] = args[0].npu_format_cast(30)
+            else:
+                args[0] = args[0].npu_format_cast(2)            
         return fn(*args, **kwargs)
     
     return wrapper
