@@ -1,5 +1,6 @@
 import torch
 import torch.distributed as dist
+import numpy as np
 from deepspeed.runtime.fp16.onebit.adam import OnebitAdam
 
 
