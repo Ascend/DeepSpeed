@@ -1,7 +1,7 @@
 import sys
 import torch
 import torch_npu
-from deepspeed.runtime.pipe.module import PipelineModule
+from deepspeed.runtime.pipe.module import PipelineModule, LayerSpec
 import deepspeed.runtime.utils as ds_utils
 from deepspeed.utils import logger
 class PipelineModuleNpu(PipelineModule):
@@ -57,6 +57,44 @@ class PipelineModuleNpu(PipelineModule):
                 return parts
 
             self.parts = partition(param_counts, num_stages)
+
+        elif method.startswith('type:'):
+            layertype = method.split(':')[1]
+            binary_weights = [0] * len(self._layer_specs)
+            for idx in self._find_layer_type(layertype):
+                binary_weights[idx] = 1
+            self.parts = ds_utils.partition_balanced(weights=binary_weights,
+                                                     num_parts=num_stages)
+        elif method == 'profile':
+            raise NotImplementedError(f'Partitioning method {method} not implemented.')
+        else:
+            raise NotImplementedError(f'Partitioning method {method} not implemented.')
+
+        # Print some information on the partitioning.
+        if self.global_rank == 0:
+            for stage in range(num_stages):
+                start = self.parts[stage]
+                stop = self.parts[stage + 1]
+                print(f'stage={stage} layers={stop - start}')
+                for idx, layer in enumerate(self._layer_specs[start:stop]):
+                    name = str(layer)
+                    if isinstance(layer, LayerSpec):
+                        name = layer.typename.__name__
+                    if isinstance(layer, torch.nn.Module):
+                        name = layer.__class__.__name__
+                    else:
+                        try:
+                            name = layer.__name__
+                        except AttributeError:
+                            pass
+                    print(f'    {idx+start:2d}: {name}')
+            if self.loss_fn:
+                try:
+                    print(f'  loss: {self.loss_fn.__name__}')
+                except AttributeError:
+                    print(f'  loss: {self.loss_fn.__class__.__name__}')
+
+        self._set_bounds(start=self.parts[stage_id], stop=self.parts[stage_id + 1])
 
 for k, v in sys.modules.items():
     if 'deepspeed' in k and hasattr(v, 'PipelineModule'):
