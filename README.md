@@ -1,5 +1,15 @@
 ## Ascend NPU适配deepspeed插件
 
+通过deepspeed_npu配合deepspeed，你可以在Ascend910芯片上使用deepspeed，并基于deepspeed进行开发。目前，deepspeed_npu主要支持以下特性
+
+1. fp16
+2. pipeline并行
+3. ZeRO（stage1-stage3）
+4. one-bit Adam
+5. MoE
+
+你可以参考deepspeed官方文档获取这些特性的详细说明：https://www.deepspeed.ai/
+
 ### 1.版本说明
 
 基于deepspeed版本0.6.0：https://github.com/microsoft/DeepSpeed/tree/v0.6.0
@@ -18,13 +28,24 @@ pip3 install deepspeed==0.6.0
 pip3 install ./
 ```
 
-### 3.使用方法
+### 3.插件使用方法
 
-在入口文件首import deepspeed_npu，并配合deepspeed/torch使用,例如
+在入口文件行首import deepspeed_npu，并配合deepspeed/torch使用,例如
 
 ```
 import deepspeed_npu
 import torch
-import deepspeed
+from deepspeed import distributed_test
+...
+```
+
+### 4.单元测试运行方法
+
+进入unit_test目录，运行各特性的单元测试
+
+MoE:
+
+```
+bash test_moe.sh
 ```
 
