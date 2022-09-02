@@ -8,7 +8,7 @@ torch.cuda.nvtx = torch.ones
 def wrapper_dist(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
-        if args[0].dtype == torch.long:
+        if len(args) > 0 and args[0].dtype == torch.long:
             new_args = copy.deepcopy(list(args))
             new_args[0] = new_args[0].int()
             tmp = fn(*new_args, **kwargs)

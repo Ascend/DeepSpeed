@@ -171,10 +171,12 @@ class DeepSpeedZeroOptimizerNpu(stage_1_and_2.DeepSpeedZeroOptimizer):
                 #                            group=real_dp_process_group[i],
                 #                            async_op=True)
                 # ASCEND AVOID
-                async_handle = dist.reduce(grad_slice,
+                tmp = grad_slice.clone()
+                async_handle = dist.reduce(tmp,
                                             dst=dst_rank,
                                             group=real_dp_process_group[i],
                                             async_op=False)
+                grad_slice.data.copy_(tmp)
                 #async_handles.append(async_handle)
 
             #for handle in async_handles:
