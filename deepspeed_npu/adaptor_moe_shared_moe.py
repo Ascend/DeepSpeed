@@ -138,7 +138,8 @@ def top1gating(logits: Tensor,
     else:
         mask1_rand = mask1
 
-    assert logits.shape[0] >= min_capacity, "No. of tokens (batch-size) should be greater than min_capacity. Either set min_capacity to 0 or increase your batch size."
+    assert logits.shape[0] >= min_capacity, "No. of tokens (batch-size) should be greater than min_capacity. " \
+                                            "Either set min_capacity to 0 or increase your batch size."
 
     top_idx = _top_idx(mask1_rand, capacity)
 

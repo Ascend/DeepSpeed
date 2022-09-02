@@ -1,6 +1,6 @@
+import sys
 import torch
 from torch_npu.npu import clear_npu_overflow_flag
-from deepspeed.runtime.pipe import engine
 from deepspeed.runtime.pipe.engine import _tensor_bytes, PipelineEngine
 from deepspeed.runtime.pipe import p2p, schedule
 from deepspeed.runtime.utils import PartitionedTensor
@@ -300,6 +300,7 @@ class PipelineEngineNPU(PipelineEngine):
     PipelineEngine._INSTRUCTION_MAP[schedule.BackwardPass] = _exec_backward_pass
     PipelineEngine._INSTRUCTION_MAP[schedule.RecvActivation] = _exec_recv_activations
     PipelineEngine._INSTRUCTION_MAP[schedule.RecvGrad] = _exec_recv_grads
+
 
 for k, v in sys.modules.items():
     if 'deepspeed' in k and hasattr(v, 'PipelineEngine'):

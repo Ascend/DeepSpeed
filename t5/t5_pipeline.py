@@ -437,7 +437,7 @@ class T5Pipeline(PipelineModule):
             if hasattr(module.wi, 'bias') and module.wi.bias is not None:
                 module.wi.bias.data.zero_()
             # module.wo.weight.data.normal_(mean=0.0, std=factor * ((self.config.d_ff) ** -0.5))
-            w = torch.normal(mean=0.0, std=factor * ((self.config.d_model) ** -0.5), size=module.wo.weight.shape)
+            w = torch.normal(mean=0.0, std=factor * ((self.config.d_ff) ** -0.5), size=module.wo.weight.shape)
             module.wo.weight.data = torch.nn.Parameter(w)
             if hasattr(module.wo, 'bias') and module.wo.bias is not None:
                 module.wo.bias.data.zero_()
@@ -481,7 +481,7 @@ class T5Pipeline(PipelineModule):
             if module.has_relative_attention_bias:
                 # module.relative_attention_bias.weight.data.normal_(mean=0.0, std=factor * ((d_model) ** -0.5))
                 w = torch.normal(mean=0.0, std=factor * ((d_model) ** -0.5),
-                                 size=module.relative_attention_bias.weigh.shape)
+                                 size=module.relative_attention_bias.weight.shape)
                 module.relative_attention_bias.weight.data = torch.nn.Parameter(w)
 
 
@@ -512,6 +512,7 @@ def create_pipeline_model(num_stages, decoder_start_token_id, dropout_rate, n_po
     config = T5Config(n_positions=n_positions, output_past=True)
     config.dropout_rate = dropout_rate
     config.decoder_start_token_id = decoder_start_token_id
+    config.moe_enabled = False
     if num_layers is not None:
         config.num_layers = num_layers
     if num_heads is not None:

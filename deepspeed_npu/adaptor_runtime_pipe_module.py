@@ -1,3 +1,4 @@
+import os
 import sys
 import torch
 import torch_npu
@@ -11,6 +12,7 @@ from deepspeed.utils import logger
 
 
 class PipelineModuleNpu(PipelineModule):
+
     def __init__(self,
                  layers,
                  num_stages=None,
@@ -55,7 +57,7 @@ class PipelineModuleNpu(PipelineModule):
             activation_checkpoint_func (callable, optional): The function to use for activation checkpointing. Defaults to ``deepspeed.checkpointing.checkpoint``.
         """
 
-        super().__init__()
+        nn.Module.__init__(self)
 
         if num_stages is None and topology is None:
             raise RuntimeError('must provide num_stages or topology')
@@ -219,6 +221,7 @@ class PipelineModuleNpu(PipelineModule):
                     print(f'  loss: {self.loss_fn.__class__.__name__}')
 
         self._set_bounds(start=self.parts[stage_id], stop=self.parts[stage_id + 1])
+
 
 for k, v in sys.modules.items():
     if 'deepspeed' in k and hasattr(v, 'PipelineModule'):

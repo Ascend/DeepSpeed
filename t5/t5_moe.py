@@ -110,7 +110,7 @@ def InitWeights(self, module):
                 module.wi.bias.data.zero_()
 
         # module.wo.weight.data.normal_(mean=0.0, std=factor * ((self.config.d_ff) ** -0.5))
-        w = torch.normal(mean=0.0, std=factor * ((self.config.d_model) ** -0.5), size=module.wo.weight.shape)
+        w = torch.normal(mean=0.0, std=factor * ((self.config.d_ff) ** -0.5), size=module.wo.weight.shape)
         module.wo.weight.data = torch.nn.Parameter(w)
         if hasattr(module.wo, 'bias') and module.wo.bias is not None:
             module.wo.bias.data.zero_()
@@ -140,16 +140,17 @@ def InitWeights(self, module):
                                                                std=factor * ((d_model * key_value_proj_dim) ** -0.5),
                                                                size=module.q.weight.shape))
         module.k.weight.data = torch.nn.Parameter(torch.normal(mean=0.0,
-                                                               std=factor * (d_model**-0.5),
+                                                               std=factor * (d_model ** -0.5),
                                                                size=module.k.weight.shape))
         module.v.weight.data = torch.nn.Parameter(torch.normal(mean=0.0,
-                                                               std=factor * (d_model**-0.5),
+                                                               std=factor * (d_model ** -0.5),
                                                                size=module.v.weight.shape))
         module.o.weight.data = torch.nn.Parameter(torch.normal(mean=0.0,
                                                                std=factor * ((n_heads * key_value_proj_dim) ** -0.5),
                                                                size=module.o.weight.shape))
         if module.has_relative_attention_bias:
-            w = torch.normal(mean=0.0, std=factor * ((d_model) ** -0.5), size=module.relative_attention_bias.weigh.shape)
+            w = torch.normal(mean=0.0, std=factor * ((d_model) ** -0.5),
+                             size=module.relative_attention_bias.weight.shape)
             module.relative_attention_bias.weight.data = torch.nn.Parameter(w)
 
 
@@ -278,9 +279,9 @@ def monkey_patching():
     # MoE monkey patching
     T5DenseReluDense.__init__ = T5DenseReluDenseInit
     T5DenseReluDense.forward = T5DenseReluDenseForward
-    T5PreTrainedModel.__init_weights = InitWeights
+    T5PreTrainedModel._init_weights = InitWeights
 
-    # T5 model monkey patch to change Loss ignore index, because its hardcode
+    # T5 model monkey patching to change Loss ignore index, because its hardcode
     T5ForConditionalGeneration.forward = T5ForConditionalGenerationForward
 
 
@@ -450,6 +451,7 @@ def train(
         },
         'fp16': {
             'enabled': fp16,
+            'initial_scale_power': initial_scale_power
         },
         'zero_optimization': {
             'stage': zero_stage,
@@ -474,7 +476,8 @@ def train(
     t5_utils.log_dist('Creating Model', ranks=[0], level=t5_utils.logging.INFO)
     model = create_model(tokenizer.added_tokens_encoder['<decoder>'], dropout, n_positions, num_layers, num_heads,
                          ff_dim, moe, moe_num_experts, moe_ep_size)
-    model, _, _, _ = deepspeed.initialize(model=model, model_parameters=model.parameters(), config=ds_config,
+    parameters = get_parameters(model, moe)
+    model, _, _, _ = deepspeed.initialize(model=model, model_parameters=parameters, config=ds_config,
                                           training_data=dataset, collate_fn=collate_fn)
 
     t5_utils.log_dist('DeepSpeed engine created', ranks=[0], level=t5_utils.logging.INFO)
@@ -508,8 +511,8 @@ def train(
             model.backward(loss)
             model.step()
 
-            t5_utils.log_dist('Step: {}\tDuration: {}\t Training Loss: {}'
-                              .format(step, datetime.datetime.now()-start_time, loss.item()),
+            t5_utils.log_dist('Step: {}\tDuration: {}\tTraining Loss: {}'
+                              .format(step, datetime.datetime.now() - start_time, loss.item()),
                               ranks=[0], level=t5_utils.logging.INFO)
 
             if step != 0 and checkpoint_every > 0 and step % checkpoint_every == 0:
