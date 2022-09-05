@@ -1,0 +1,54 @@
+## T5 模型上 DeepSpeed 特性的应用
+
+### 简介
+此目录下包含了两个 huggingface 上 T5-small 模型的 DeepSpeed 特性组合应用，分别为 FP16 + Pipeline + ZeRO stage 1 以及 FP16 + MoE + ZeRO stage 2 两种特性组合。
+可以通过 `run_t5_pipe.sh` 和 `run_t5_moe.sh` 两个脚本运行相对应的特性组合模型。
+
+### 安装依赖库
+
+请确保环境上有以下依赖库：
+
+```shell
+pip install sentencepiece fire loguru sh tensorboard pytz Pillow pytest faiss-cpu datasets transformers==4.18.0
+```
+
+### DeepSpeed 库及 DeepSpeed NPU 插件
+
+请确保已安装 DeepSpeed 库，以及 DeepSpeed NPU 插件。
+```shell
+pip install deepspeed==0.6.0
+git clone https://gitee.com/ascend/DeepSpeed.git --branch adaptor
+cd DeepSpeed
+pip install ./
+```
+
+### 数据集的下载验证
+
+两个模型都使用了 huggingface 上的 wiki_dpr 数据集作为预训练数据集，模型代码已经集成对数据集的下载。
+在第一次运行时请将运行脚本里的 `HF_DATASETS_OFFLINE` 环境变量设置为 0，关闭离线模式，设置 `--dataset_dir` 数据集文件夹参数，下载验证数据集。
+在数据集完成下载后，可将 `HF_DATASETS_OFFLINE` 设置回 1，打开离线模式，不再对数据集做验证操作。
+注意，此数据集的数据量较大，请准备至少 200 GiB 的硬盘空间。
+
+### 运行模型
+
+模型通过运行 shell 脚本启动，想运行 T5（FP16 + Pipeline + ZeRO stage 1）模型请使用 `run_t5_pipe.sh` 脚本。
+想运行 T5（FP16 + MoE + ZeRO stage 2）模型请使用 `run_t5_moe.sh` 脚本。请在脚本中设置好数据集位置。
+
+### 超参介绍
+
+| 参数                      | 解释                  |
+|-------------------------|---------------------|
+| --include               | 设置计算卡               |
+| --checkpoint_dir        | 模型存档文件夹             |
+| --tokenizer_name_or_dir | 分词器名称或文件夹           |
+| --dataset_dir           | 数据集文件夹              |
+| --num_iterations        | 训练步数                |
+| --fp16                  | 混合精度模式              |
+| --initial_scale_power   | 动态 Loss Scale 的幂初始值 |
+| --batch_size            | Batch 大小            |
+| --dropout               | Dropout 概率          |
+| --num_stage             | Pipeline 并行切分数      |
+| --zero_stage            | ZeRO 特性的 stage      |
+| --moe                   | 开启 MoE 特性           |
+| --moe_num_experts       | MoE 专家数             |
+| --moe_ep_size           | MoE 专家并行数           |
