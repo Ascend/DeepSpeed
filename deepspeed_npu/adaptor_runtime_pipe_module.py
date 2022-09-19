@@ -154,7 +154,7 @@ class PipelineModuleNpu(PipelineModule):
             param_counts = self._count_layer_params()
             self.parts = ds_utils.partition_balanced(weights=param_counts,
                                                      num_parts=num_stages)
-        elif method == 't5':
+        elif method == 'greedy':
             param_counts = self._count_layer_params()
 
             def partition(weights, num_parts):

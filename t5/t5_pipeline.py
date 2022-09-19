@@ -412,7 +412,7 @@ class T5Pipeline(PipelineModule):
         self.specs.append(LayerSpec(T5DropoutPipeline, config.dropout_rate))
         self.specs.append(TiedLayerSpec('embedding', T5EmbeddingPipeline, config, forward_fn=t5_lmhead_forward))
 
-        super().__init__(layers=self.specs, num_stages=num_stages, loss_fn=loss_fn_pipe, partition_method='t5')
+        super().__init__(layers=self.specs, num_stages=num_stages, loss_fn=loss_fn_pipe, partition_method='greedy')
         self.apply(self._init_weights)
 
     def _init_weights(self, module):
