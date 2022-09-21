@@ -2,7 +2,7 @@
 
 ### 简介
 此目录下包含了两个 huggingface 上 T5-small 模型的 DeepSpeed 特性组合应用，分别为 FP16 + Pipeline + ZeRO stage 1 以及 FP16 + MoE + ZeRO stage 2 两种特性组合。
-可以通过 `run_t5_pipe.sh` 和 `run_t5_moe.sh` 两个脚本运行相对应的特性组合模型。
+可以通过 train 脚本运行相对应的特性组合模型。
 
 ### 安装依赖库
 
@@ -31,8 +31,14 @@ pip install ./
 
 ### 运行模型
 
-模型通过运行 shell 脚本启动，想运行 T5（FP16 + Pipeline + ZeRO stage 1）模型请使用 `run_t5_pipe.sh` 脚本。
-想运行 T5（FP16 + MoE + ZeRO stage 2）模型请使用 `run_t5_moe.sh` 脚本。请在脚本中设置好数据集位置。
+模型通过运行 shell 脚本启动，想运行 T5（FP16 + Pipeline + ZeRO stage 1）模型请使用 `train_t5_pipeline_full_8p.sh` 脚本。
+想运行 T5（FP16 + MoE + ZeRO stage 2）模型请使用 `train_t5_moe_full_8p.sh` 脚本。请将数据集地址作为 data_path 参数传入，例如：
+
+```commandline
+bash train_t5_pipeline_full_8p.sh --data_path=/home/datasets/T5
+```
+
+相关日志会保存在 `./output/<模型名称>` 文件夹下。
 
 ### 超参介绍
 
@@ -55,7 +61,7 @@ pip install ./
 
 ### 常见环境问题
 
-#### `libgomp-d22c30c5.so` 无法在静态 TLS 块中分配内存
+`libgomp-d22c30c5.so` 无法在静态 TLS 块中分配内存
 ```
 libgomp-d22c30c5.so.1.0.0:cannot allocate memory in static TLS block
 ```

@@ -58,6 +58,7 @@ fi
 
 # HuggingFace 数据集离线模式，1开启、0关闭（离线数据集下载完第一次需要验证完整性）
 export HF_DATASETS_OFFLINE=1
+export HCCL_CONNECT_TIMEOUT=240
 
 echo "Start training..."
 
@@ -91,7 +92,7 @@ FPS=`cat ${test_path_dir}/output/${Network}/train_${CaseName}_fps.log | awk -F: 
 echo "Step average duration: $FPS"
 
 # 输出训练精度,需要模型审视修改
-train_accuracy=`grep -a 'finish training, last'  ${test_path_dir}/output/${Network}/train_${Network}.log | awk '{print $16}'`
+train_accuracy=`grep -a 'finished training, last'  ${test_path_dir}/output/${Network}/train_${Network}.log | awk '{print $16}'`
 # 打印，不需要修改
 echo "Last 1K average loss: ${train_accuracy}"
 echo "E2E Training Duration sec : $e2e_time"
