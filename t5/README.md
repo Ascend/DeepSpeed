@@ -52,3 +52,15 @@ pip install ./
 | --moe                   | 开启 MoE 特性           |
 | --moe_num_experts       | MoE 专家数             |
 | --moe_ep_size           | MoE 专家并行数           |
+
+### 常见环境问题
+
+#### `libgomp-d22c30c5.so` 无法在静态 TLS 块中分配内存
+```
+libgomp-d22c30c5.so.1.0.0:cannot allocate memory in static TLS block
+```
+
+解决方法：在环境变量`LD_PRELOAD`中添加 `libgomp-d22c30c5.so` 路径
+```
+export LD_PRELOAD=$LD_PRELOAD:<绝对路径>/libgomp-d22c30c5.so.1.0.0
+```
