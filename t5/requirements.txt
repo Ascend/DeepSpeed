@@ -1,0 +1,11 @@
+sentencepiece
+fire
+loguru
+sh
+tensorboard
+pytz
+Pillow
+pytest
+faiss-cpu
+datasets
+transformers==4.18.0
