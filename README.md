@@ -22,6 +22,12 @@
 pip3 install deepspeed==0.6.0
 ```
 
+下载deepspeed_npu
+
+```
+git clone https://gitee.com/ascend/DeepSpeed.git -b adaptor
+```
+
 然后在工程根目录安装插件
 
 ```
