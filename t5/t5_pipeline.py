@@ -722,7 +722,7 @@ def train(
             t5_utils.log_dist("Saved model to {0}".format(exp_dir), ranks=[0], level=t5_utils.logging.INFO)
 
         if step > num_iterations - 1000:
-            last_losses.append(loss)
+            last_losses.append(loss.item())
         if step >= num_iterations:
             break
 

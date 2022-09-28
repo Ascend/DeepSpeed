@@ -522,7 +522,7 @@ def train(
 
             step += 1
             if step > num_iterations - 1000:
-                last_losses.append(loss)
+                last_losses.append(loss.item())
             if step >= num_iterations:
                 break
 
