@@ -29,7 +29,7 @@ class CPUAdamBuilderNPU(TorchCPUOpBuilder):
                 '-L' + os.path.join(self.torch_npu_path, 'lib'), '-ltorch_npu']
 
     def cxx_args(self):
-        return ['-03', '-std=c++14', '-g', '-Wno-reorder', '-fopenmp',
+        return ['-O3', '-std=c++14', '-g', '-Wno-reorder', '-fopenmp',
                 '-L' + os.path.join(self.ascend_path, 'lib64'),
                 '-L' + os.path.join(self.torch_npu_path, 'lib')]
 

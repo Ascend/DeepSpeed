@@ -39,8 +39,8 @@ public:
         _buf_index(false),
         _adamw_mode(adamw_mode)
     {
-        aclrtMallocHost((void**)_doubled_buffer, TILE * sizeof(float));
-        aclrtMallocHost((void**)(_doubled_buffer + 1), TILE * sizeof(float));
+        aclrtMallocHost((void**)_doubled_buffer, TILE * sizeof(__half));
+        aclrtMallocHost((void**)(_doubled_buffer + 1), TILE * sizeof(__half));
     }
 
     ~Adam_Optimizer()

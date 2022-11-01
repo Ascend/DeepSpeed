@@ -83,7 +83,7 @@ void Adam_Optimizer::Step_1(
                 _exp_avg_sq[k] = variance;
             }
             if (dev_params) {
-                size_t MemoryCpySize = copy_size * sizeof(_doubled_bufferp[_buf_index][0]);
+                size_t MemoryCpySize = copy_size * sizeof(_doubled_buffer[_buf_index][0]);
                 aclrtMemcpy(dev_params + t, MemoryCpySize, _doubled_buffer[_buf_index], MemoryCpySize,
                     aclrtMemcpyKind::ACL_MEMCPY_HOST_TO_DEVICE);
 
@@ -224,17 +224,17 @@ int ds_adam_step_plus_copy(
     torch::Tensor& grads,
     torch::Tensor& exp_avg,
     torch::Tensor& exp_avg_sq,
-    torch::Tensor& gpu_params
+    torch::Tensor& npu_params
 ){
     auto params_c = params.contiguous();
-    auto gpu_params_c = gpu_params.contiguous();
+    auto npu_params_c = npu_params.contiguous();
     auto exp_avg_c = exp_avg.contiguous();
     auto exp_avg_sq_c = exp_avg_sq.contiguous();
     auto grads_c = grads.contiguous();
 
     float* params_ptr = (float*)params_c.data_ptr();
     float* grads_ptr = (float*)grads_c.data_ptr();
-    __half* gpu_params_ptr = (__half*)gpu_params_c.data_ptr();
+    __half* npu_params_ptr = (__half*)npu_params_c.data_ptr();
     float* exp_avg_ptr = (float*)exp_avg_c.data_ptr();
     float* exp_avg_sq_ptr = (float*)exp_avg_sq_c.data_ptr();
 
@@ -246,7 +246,7 @@ int ds_adam_step_plus_copy(
                 exp_avg_ptr,
                 exp_avg_sq_ptr,
                 params_c.size(0),
-                gpu_params_ptr,
+                npu_params_ptr,
                 (params.options().dtype() == at::kHalf));
 
     opt->SynchronizeStreams();
