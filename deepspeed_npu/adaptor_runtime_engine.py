@@ -65,17 +65,10 @@ def _configure_basic_optimizer(self, model_parameters):
                         **optimizer_parameters,
                     )
                 else:
-                    '''
-                    # ASCEND VOID OPT
                     from deepspeed.ops.adam import DeepSpeedCPUAdam
                     optimizer = DeepSpeedCPUAdam(model_parameters,
                                                     **optimizer_parameters,
                                                     adamw_mode=effective_adam_w_mode)
-                    '''
-                    optimizer = torch.optim.Adam(
-                        model_parameters,
-                        **optimizer_parameters,
-                    )
             else:
                 # ASCEND VOID OPT
                 # from deepspeed.ops.adam import FusedAdam

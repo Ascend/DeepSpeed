@@ -61,7 +61,7 @@ export HF_DATASETS_OFFLINE=1
 
 echo "Start training..."
 
-nohup python run.py --include localhost:0,1,2,3,4,5,6,7 t5_moe.py \
+nohup python run.py --include localhost:0,1,2,3,4,5,6,7 t5_model.py \
 --checkpoint_dir ./checkpoint \
 --tokenizer_name_or_dir ./tokenizer \
 --dataset_dir ${data_path} \
