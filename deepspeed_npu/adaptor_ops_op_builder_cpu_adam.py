@@ -18,7 +18,7 @@ class CPUAdamBuilderNPU(TorchCPUOpBuilder):
         return f'deepspeed.ops.adam.{self.NAME}_op'
 
     def sources(self):
-        return [os.path.join(os.path.dirname(os.path.abspath(__file__))), 'csrc_npu/adam/cpu_adam.cpp']
+        return [os.path.join(os.path.dirname(os.path.abspath(__file__)), 'csrc_npu/adam/cpu_adam.cpp')]
 
     def include_paths(self):
         return ['csrc/includes', os.path.join(self.ascend_path, 'include'),
