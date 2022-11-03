@@ -345,6 +345,7 @@ def train(
     fp16: bool = False,
     initial_scale_power: int = 32,
     zero_stage: int = 0,
+    cpu_adam: bool = False,
     moe: bool = False,
     moe_num_experts: int = 128,
     moe_ep_size: int = 1,
@@ -387,6 +388,7 @@ def train(
             'fp16': fp16,
             'initial_scale_power': initial_scale_power,
             'zero_stage': zero_stage,
+            'cpu_adam': cpu_adam,
             'moe': moe,
             'moe_num_experts': moe_num_experts,
             'moe_ep_size': moe_ep_size
@@ -422,6 +424,7 @@ def train(
         fp16 = hparams.get('fp16', fp16)
         initial_scale_power = hparams.get('initial_scale_power', initial_scale_power)
         zero_stage = hparams.get('zero_stage', zero_stage)
+        cpu_adam = hparams.get('cpu_adam', cpu_adam)
         moe = hparams.get('moe', moe)
         moe_num_experts = hparams.get('moe_num_experts', moe_num_experts)
         moe_ep_size = hparams.get('moe_ep_size', moe_ep_size)
@@ -434,7 +437,7 @@ def train(
             'type': 'Adam',
             'params': {
                 'lr': 1e-4,
-                'torch_adam': True
+                'torch_adam': not cpu_adam
             }
         },
         'dataloader_drop_last': True,
@@ -461,6 +464,11 @@ def train(
             'tag_validation': 'Ignore'
         }
     }
+
+    if cpu_adam:
+        ds_config['zero_optimization'].update({
+            'offload_optimizer': {'device': 'cpu'}
+        })
 
     t5_utils.log_dist('Creating Tokenizer', ranks=[0], level=t5_utils.logging.INFO)
     tokenizer = t5_utils.create_tokenizer(tokenizer_name_or_dir)

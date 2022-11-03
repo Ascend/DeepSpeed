@@ -3,7 +3,7 @@
 ################基础配置参数，需要模型审视修改##################
 # 必选字段(必须在此处定义的参数): Network batch_size RANK_SIZE
 # 网络名称，同目录名称
-Network="T5_MoE"
+Network="T5_ZeRO1_Offload"
 # 训练batch_size
 batch_size=8
 # 训练使用的npu卡数
@@ -66,7 +66,7 @@ nohup python run.py --include localhost:0,1,2,3,4,5,6,7 t5_model.py \
 --tokenizer_name_or_dir ./tokenizer \
 --dataset_dir ${data_path} \
 --fp16 --initial_scale_power 15 --batch_size ${batch_size} --dropout 0.1 \
---zero_stage 2 --moe --moe_num_experts 16 --moe_ep_size 4 \
+--zero_stage 1 --cpu_adam \
 --num_iterations ${train_iterations} > ${test_path_dir}/output/${Network}/train_${Network}.log 2>&1 &
 
 wait

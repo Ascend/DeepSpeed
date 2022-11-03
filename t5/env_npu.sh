@@ -13,6 +13,8 @@ else
     source ${CANN_INSTALL_PATH}/nnae/set_env.sh
 fi
 
+export LD_LIBRARY_PATH=${CANN_INSTALL_PATH}/ascend-toolkit/latest/fwkacllib/lib64:$LD_LIBRARY_PATH
+
 export BMMV2_ENABLE=1
 export SCALAR_TO_HOST_MEM=1
 #将Host日志输出到串口,0-关闭/1-开启
