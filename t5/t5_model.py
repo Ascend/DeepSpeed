@@ -321,6 +321,7 @@ def create_model(decoder_start_token_id, dropout_rate, n_positions, num_layers, 
 def train(
     checkpoint_dir: str = None,
     load_checkpoint_dir: str = None,
+    print_memory: bool = False,
 
     # Dataset Params
     dataset_dir: str = None,
@@ -522,6 +523,11 @@ def train(
             t5_utils.log_dist('Step: {}\tDuration: {}\tTraining Loss: {}'
                               .format(step, datetime.datetime.now() - start_time, loss.item()),
                               ranks=[0], level=t5_utils.logging.INFO)
+
+            if print_memory:
+                if torch.npu.current_device() == 0:
+                    print(torch.npu.memory_summary(), end='')
+                exit(0)
 
             if step != 0 and checkpoint_every > 0 and step % checkpoint_every == 0:
                 model.save_checkpoint(save_dir=exp_dir, client_state={'checkpoint_step': step},
