@@ -9,7 +9,7 @@
 请确保环境上有以下依赖库：
 
 ```shell
-pip install sentencepiece fire loguru sh tensorboard pytz Pillow pytest faiss-cpu datasets transformers==4.18.0
+pip install sentencepiece fire loguru sh tensorboard pytz Pillow pytest faiss-cpu decorator sympy datasets==2.2.1 transformers==4.18.0
 ```
 
 ### DeepSpeed 库及 DeepSpeed NPU 插件
@@ -32,13 +32,43 @@ pip install ./
 ### 运行模型
 
 模型通过运行 shell 脚本启动，想运行 T5（FP16 + Pipeline + ZeRO stage 1）模型请使用 `train_t5_pipeline_full_8p.sh` 脚本。
-想运行 T5（FP16 + MoE + ZeRO stage 2）模型请使用 `train_t5_moe_full_8p.sh` 脚本。请将数据集地址作为 data_path 参数传入，例如：
+想运行 T5（FP16 + MoE + ZeRO stage 2）模型请使用 `train_t5_moe_full_8p.sh` 脚本。请将数据集地址作为 data_path 参数传入。
+
+#### T5（FP16 + Pipeline + ZeRO stage 1）
 
 ```commandline
 bash train_t5_pipeline_full_8p.sh --data_path=/home/datasets/T5
 ```
 
-相关日志会保存在 `./output/<模型名称>` 文件夹下。
+#### T5（FP16 + MoE + ZeRO stage 2）
+
+```commandline
+bash train_t5_moe_full_8p.sh --data_path=/home/datasets/T5
+```
+
+#### T5（FP16 + ZeRO stage 1 + ZeRO Offload）
+
+```commandline
+bash train_t5_zero1_offload_full_8p.sh --data_path=/home/datasets/T5
+```
+
+#### T5（FP16 + ZeRO stage 2 + ZeRO Offload）
+
+```commandline
+bash train_t5_zero2_offload_full_8p.sh --data_path=/home/datasets/T5
+```
+
+以上模型相关日志会保存在 `./output/<模型名称>` 文件夹下。
+
+#### T5 ZeRO Offload 内存对比
+
+此脚本会使用 3 亿 6 千万参数量的 T5 模型，运行两次，一次开启 ZeRO Offload，一次不开启，在运行一个 step 后，
+通过 `torch.npu.memory_summary()` 函数获取当前时刻下的内存使用量，最后打印两次获取到的内存数值。
+（注意，因为 PyTorch 内存特殊申请机制，此方式获取到的内存值只能作为大概参考，并不是准确数值）
+
+```commandline
+bash run_t5_zero1_memory.sh --data_path=/home/datasets/T5
+```
 
 ### 超参介绍
 
