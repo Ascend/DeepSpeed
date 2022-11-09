@@ -25,6 +25,8 @@ else
     fi
 fi
 
+export ASCEND_TOOLKIT_HOME=${install_path}/ascend-toolkit/latest
+
 export BMMV2_ENABLE=1
 export SCALAR_TO_HOST_MEM=1
 #将Host日志输出到串口,0-关闭/1-开启

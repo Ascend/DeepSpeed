@@ -1,15 +1,16 @@
 ## T5 模型上 DeepSpeed 特性的应用
 
 ### 简介
-此目录下包含了两个 huggingface 上 T5-small 模型的 DeepSpeed 特性组合应用，分别为 FP16 + Pipeline + ZeRO stage 1 以及 FP16 + MoE + ZeRO stage 2 两种特性组合。
-可以通过 train 脚本运行相对应的特性组合模型。
+此目录中主要是对 DeepSpeed 特性进行组合，通过 T5 模型去承载验证。
+特性包括 FP16、Pipeline parallelism、MoE、ZeRO stage 1/2、ZeRO Offload 等特性组合。
+模型使用的是 HuggingFace 上的 T5-small，数据集同样为 HuggingFace datasets 库提供的 wiki_dpr。
 
 ### 安装依赖库
 
 请确保环境上有以下依赖库：
 
 ```shell
-pip install sentencepiece fire loguru sh tensorboard pytz Pillow pytest faiss-cpu datasets transformers==4.18.0
+pip install sentencepiece fire loguru sh tensorboard pytz Pillow pytest faiss-cpu decorator sympy datasets==2.2.1 transformers==4.18.0
 ```
 
 ### DeepSpeed 库及 DeepSpeed NPU 插件
@@ -24,21 +25,51 @@ pip install ./
 
 ### 数据集的下载验证
 
-两个模型都使用了 huggingface 上的 wiki_dpr 数据集作为预训练数据集，模型代码已经集成对数据集的下载。
+就像之前提过的，模型使用了 HuggingFace 上的 wiki_dpr 数据集作为预训练数据集，模型代码已经集成对数据集的下载。
 在第一次运行时请将运行脚本里的 `HF_DATASETS_OFFLINE` 环境变量设置为 0，关闭离线模式，设置 `--dataset_dir` 数据集文件夹参数，下载验证数据集。
 在数据集完成下载后，可将 `HF_DATASETS_OFFLINE` 设置回 1，打开离线模式，不再对数据集做验证操作。
 注意，此数据集的数据量较大，请准备至少 200 GiB 的硬盘空间。
 
 ### 运行模型
 
-模型通过运行 shell 脚本启动，想运行 T5（FP16 + Pipeline + ZeRO stage 1）模型请使用 `train_t5_pipeline_full_8p.sh` 脚本。
-想运行 T5（FP16 + MoE + ZeRO stage 2）模型请使用 `train_t5_moe_full_8p.sh` 脚本。请将数据集地址作为 data_path 参数传入，例如：
+模型通过运行 shell 脚本启动，如想运行 T5（FP16 + Pipeline + ZeRO stage 1）模型请使用 `train_t5_pipeline_full_8p.sh` 脚本。
+如想运行 T5（FP16 + MoE + ZeRO stage 2）模型请使用 `train_t5_moe_full_8p.sh` 脚本。请将数据集地址作为 data_path 参数传入。
+
+#### T5（FP16 + Pipeline + ZeRO stage 1）
 
 ```commandline
 bash train_t5_pipeline_full_8p.sh --data_path=/home/datasets/T5
 ```
 
-相关日志会保存在 `./output/<模型名称>` 文件夹下。
+#### T5（FP16 + MoE + ZeRO stage 2）
+
+```commandline
+bash train_t5_moe_full_8p.sh --data_path=/home/datasets/T5
+```
+
+#### T5（FP16 + ZeRO stage 1 + ZeRO Offload）
+
+```commandline
+bash train_t5_zero1_offload_full_8p.sh --data_path=/home/datasets/T5
+```
+
+#### T5（FP16 + ZeRO stage 2 + ZeRO Offload）
+
+```commandline
+bash train_t5_zero2_offload_full_8p.sh --data_path=/home/datasets/T5
+```
+
+以上模型相关日志会保存在 `./output/<模型名称>` 文件夹下。
+
+#### T5 ZeRO Offload 内存对比
+
+此脚本会使用 3 亿 6 千万参数量的 T5 模型，运行两次，一次开启 ZeRO Offload，一次不开启，在运行一个 step 后，
+通过 `torch.npu.memory_summary()` 函数获取当前时刻下的内存使用量，最后打印两次获取到的内存数值。
+（注意，因为 PyTorch 内存特殊申请机制，此方式获取到的内存值只能作为大概参考，并不是准确数值）
+
+```commandline
+bash run_t5_zero1_memory.sh --data_path=/home/datasets/T5
+```
 
 ### 超参介绍
 
@@ -55,6 +86,8 @@ bash train_t5_pipeline_full_8p.sh --data_path=/home/datasets/T5
 | --dropout               | Dropout 概率          |
 | --num_stage             | Pipeline 并行切分数      |
 | --zero_stage            | ZeRO 特性的 stage      |
+| --cpu_adam              | 开启 CPU Adam 特性      |
+| --print_memory          | 执行一次 step 后打印内存使用量  |
 | --moe                   | 开启 MoE 特性           |
 | --moe_num_experts       | MoE 专家数             |
 | --moe_ep_size           | MoE 专家并行数           |

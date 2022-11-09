@@ -301,7 +301,7 @@ def get_parameters(model, moe_enabled):
         return filter(lambda p: p.requires_grad, model.parameters())
 
 
-def create_model(decoder_start_token_id, dropout_rate, n_positions, num_layers, num_heads, ff_dim,
+def create_model(decoder_start_token_id, dropout_rate, n_positions, num_layers, num_heads, ff_dim, d_model,
                  moe, moe_num_experts, moe_ep_size):
     config = T5Config(n_positions=n_positions, output_past=True)
     config.decoder_start_token_id = decoder_start_token_id
@@ -312,6 +312,8 @@ def create_model(decoder_start_token_id, dropout_rate, n_positions, num_layers, 
         config.num_heads = num_heads
     if ff_dim is not None:
         config.d_ff = ff_dim
+    if d_model is not None:
+        config.d_model = d_model
     config.moe_enabled = moe
     config.moe_num_experts = moe_num_experts
     config.moe_ep_size = moe_ep_size
@@ -321,6 +323,7 @@ def create_model(decoder_start_token_id, dropout_rate, n_positions, num_layers, 
 def train(
     checkpoint_dir: str = None,
     load_checkpoint_dir: str = None,
+    print_memory: bool = False,
 
     # Dataset Params
     dataset_dir: str = None,
@@ -334,6 +337,7 @@ def train(
     num_heads: int = None,
     ff_dim: int = None,
     n_positions: int = 512,
+    d_model: int = 512,
     dropout: float = 0.1,
 
     # Training Params
@@ -377,6 +381,7 @@ def train(
             'num_heads': num_heads,
             'ff_dim': ff_dim,
             'n_positions': n_positions,
+            'd_model': d_model,
             'dropout': dropout,
 
             # Training Params
@@ -412,6 +417,7 @@ def train(
         num_heads = hparams.get('num_heads', num_heads)
         ff_dim = hparams.get('ff_dim', ff_dim)
         n_positions = hparams.get('n_positions', n_positions)
+        d_model = hparams.get('d_model', d_model)
         dropout = hparams.get('dropout', dropout)
 
         # Training Params
@@ -483,7 +489,7 @@ def train(
 
     t5_utils.log_dist('Creating Model', ranks=[0], level=t5_utils.logging.INFO)
     model = create_model(tokenizer.added_tokens_encoder['<decoder>'], dropout, n_positions, num_layers, num_heads,
-                         ff_dim, moe, moe_num_experts, moe_ep_size)
+                         ff_dim, d_model, moe, moe_num_experts, moe_ep_size)
     parameters = get_parameters(model, moe)
     model, _, _, _ = deepspeed.initialize(model=model, model_parameters=parameters, config=ds_config,
                                           training_data=dataset, collate_fn=collate_fn)
@@ -522,6 +528,11 @@ def train(
             t5_utils.log_dist('Step: {}\tDuration: {}\tTraining Loss: {}'
                               .format(step, datetime.datetime.now() - start_time, loss.item()),
                               ranks=[0], level=t5_utils.logging.INFO)
+
+            if print_memory:
+                if torch.npu.current_device() == 0:
+                    print(torch.npu.memory_summary(), end='')
+                exit(0)
 
             if step != 0 and checkpoint_every > 0 and step % checkpoint_every == 0:
                 model.save_checkpoint(save_dir=exp_dir, client_state={'checkpoint_step': step},
