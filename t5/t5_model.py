@@ -10,6 +10,7 @@ import torch
 import torch_npu
 import transformers
 import t5_utils
+import t5_patch
 
 from torch.nn import CrossEntropyLoss
 from torch.utils.data import DataLoader
@@ -22,22 +23,22 @@ from functools import partial
 from typing import Tuple, List, Optional, Union
 
 
-def collate_function(batch: List[Tuple[List[int], List[int]]], pad_token_id: int):
-    max_length = 1024
+def collate_function(batch: List[Tuple[List[int], List[int]]], pad_token_id: int, max_length: int):
+    # max_length = 1024
     padded_token_ids = [token_ids + [pad_token_id for _ in range(0, max_length - len(token_ids))]
                         for token_ids, _ in batch]
     padded_labels = [labels + [pad_token_id for _ in range(0, max_length - len(labels))] for _, labels in batch]
 
-    src_tokens = torch.LongTensor(padded_token_ids)
-    tgt_tokens = torch.LongTensor(padded_labels)
+    src_tokens = torch.IntTensor(padded_token_ids)
+    tgt_tokens = torch.IntTensor(padded_labels)
 
     attention_mask = src_tokens.ne(pad_token_id).type_as(src_tokens)
     decoder_attention_mask = tgt_tokens.ne(pad_token_id).type_as(tgt_tokens)
     return (src_tokens, tgt_tokens, attention_mask, decoder_attention_mask)
 
 
-def create_collate_fn(tokenizer):
-    collate_fn_partial = partial(collate_function, pad_token_id=tokenizer.pad_token_id)
+def create_collate_fn(tokenizer, max_length: int):
+    collate_fn_partial = partial(collate_function, pad_token_id=tokenizer.pad_token_id, max_length=max_length)
     return collate_fn_partial
 
 
@@ -284,6 +285,8 @@ def monkey_patching():
     # T5 model monkey patching to change Loss ignore index, because its hardcode
     T5ForConditionalGeneration.forward = T5ForConditionalGenerationForward
 
+    t5_patch.t5_performance_optimize()
+
 
 def create_moe_param_groups(model):
     from deepspeed.moe.utils import split_params_into_different_moe_groups_for_optimizer
@@ -482,7 +485,7 @@ def train(
     t5_utils.log_dist('Creating Datasets', ranks=[0], level=t5_utils.logging.INFO)
     dataset = t5_utils.create_dataset(tokenizer=tokenizer, dataset_dir=dataset_dir, mask_prob=mask_prob,
                                       random_replace_span=random_replace_span, max_seq_length=max_seq_length)
-    collate_fn = create_collate_fn(tokenizer)
+    collate_fn = create_collate_fn(tokenizer, max_length=max_seq_length)
     train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_fn, drop_last=True)
     t5_utils.log_dist('Dataset Creation Done with length: {}'.format(len(dataset)),
                       ranks=[0], level=t5_utils.logging.INFO)
