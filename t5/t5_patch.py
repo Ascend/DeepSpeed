@@ -171,21 +171,9 @@ def _shift_right(self, input_ids):
     return shifted_input_ids
 
 
-def T5LayerNormForward(self, hidden_states):
-    variance = hidden_states.to(torch.float16).pow(2).mean(-1, keepdim=True)
-    hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
-
-    # convert into half-precision if necessary
-    if self.weight.dtype in [torch.float16, torch.bfloat16]:
-        hidden_states = hidden_states.to(self.weight.dtype)
-
-    return self.weight * hidden_states
-
-
 def t5_performance_optimize():
     T5Block.forward = t5_block_forward
     T5Attention._relative_position_bucket = _relative_position_bucket
     T5Attention.compute_bias = compute_bias
 
     T5PreTrainedModel._shift_right = _shift_right
-    T5LayerNorm.forward = T5LayerNormForward
