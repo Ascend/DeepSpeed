@@ -7,7 +7,7 @@ Network="T5_FP16"
 # 训练batch_size
 batch_size=8
 # 训练使用的npu卡数
-export RANK_SIZE=8
+export RANK_SIZE=1
 # 数据集路径,保持为空,不需要修改
 data_path=""
 
