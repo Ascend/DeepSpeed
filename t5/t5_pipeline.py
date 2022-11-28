@@ -307,7 +307,7 @@ class T5LastEncoderLayerPipeline(torch.nn.Module):
             shifted_input_ids = torch.full(input_ids.shape[:-1] + (1,), decoder_start_token_id)
             shifted_input_ids = torch.cat([shifted_input_ids, input_ids[..., :-1]], dim=-1)
         else:
-            shifted_input_ids = input_ids.full(input_ids.shape, decoder_start_token_id,
+            shifted_input_ids = torch.full(input_ids.shape, decoder_start_token_id,
                                                dtype=input_ids.dtype, device=input_ids.device)
             shifted_input_ids[..., 1:] = input_ids[..., :-1].clone()
 
