@@ -11,6 +11,7 @@ import deepspeed_npu
 import deepspeed
 import fire
 import t5_utils
+import t5_patch
 
 from functools import partial
 from collections import namedtuple
@@ -306,15 +307,16 @@ class T5LastEncoderLayerPipeline(torch.nn.Module):
             shifted_input_ids = torch.full(input_ids.shape[:-1] + (1,), decoder_start_token_id)
             shifted_input_ids = torch.cat([shifted_input_ids, input_ids[..., :-1]], dim=-1)
         else:
-            shifted_input_ids = input_ids.new_zeros(input_ids.shape)
+            shifted_input_ids = input_ids.full(input_ids.shape, decoder_start_token_id,
+                                               dtype=input_ids.dtype, device=input_ids.device)
             shifted_input_ids[..., 1:] = input_ids[..., :-1].clone()
-            shifted_input_ids[..., 0] = decoder_start_token_id
 
         assert pad_token_id is not None, 'self.model.config.pad_token_id has to be defined.'
-        # replace possible -100 values in labels by `pad_token_id`
-        shifted_input_ids.masked_fill_(shifted_input_ids == -100, pad_token_id)
 
-        assert torch.all(shifted_input_ids >= 0).item(), 'Verify that `shifted_input_ids` has only positive values'
+        # don't need, because collate_function does it
+        # replace possible -100 values in labels by `pad_token_id`
+        # shifted_input_ids.masked_fill_(shifted_input_ids == -100, pad_token_id)
+        # assert torch.all(shifted_input_ids >= 0).item(), 'Verify that `shifted_input_ids` has only positive values'
 
         return shifted_input_ids
 
@@ -489,10 +491,9 @@ class T5Pipeline(PipelineModule):
 ########### Huggingface Transformers Related Functions ###############
 ######################################################################
 
-def collate_function(batch: List[Tuple[List[int], List[int]]], pad_token_id: int):
-    max_length = 1024
-    padded_token_ids = [token_ids + [pad_token_id for _ in range(0, max_length - len(token_ids))] for token_ids, _ in
-                        batch]
+def collate_function(batch: List[Tuple[List[int], List[int]]], pad_token_id: int, max_length: int):
+    padded_token_ids = [token_ids + [pad_token_id for _ in range(0, max_length - len(token_ids))]
+                        for token_ids, _ in batch]
     padded_labels = [labels + [pad_token_id for _ in range(0, max_length - len(labels))] for _, labels in batch]
 
     src_tokens = torch.IntTensor(padded_token_ids)
@@ -503,12 +504,12 @@ def collate_function(batch: List[Tuple[List[int], List[int]]], pad_token_id: int
     return ((src_tokens, tgt_tokens, attention_mask, decoder_attention_mask), tgt_tokens)
 
 
-def create_collate_fn(tokenizer):
-    collate_fn_partial = partial(collate_function, pad_token_id=tokenizer.pad_token_id)
+def create_collate_fn(tokenizer, max_length: int):
+    collate_fn_partial = partial(collate_function, pad_token_id=tokenizer.pad_token_id, max_length=max_length)
     return collate_fn_partial
 
 
-def create_pipeline_model(num_stages, decoder_start_token_id, dropout_rate, n_positions, num_layers, num_heads, ff_dim):
+def create_pipeline_model(num_stages, decoder_start_token_id, dropout_rate, n_positions, num_layers, num_heads, ff_dim, d_model):
     config = T5Config(n_positions=n_positions, output_past=True)
     config.dropout_rate = dropout_rate
     config.decoder_start_token_id = decoder_start_token_id
@@ -519,6 +520,8 @@ def create_pipeline_model(num_stages, decoder_start_token_id, dropout_rate, n_po
         config.num_heads = num_heads
     if ff_dim is not None:
         config.d_ff = ff_dim
+    if d_model is not None:
+        config.d_model = d_model
     return T5Pipeline(config, num_stages=num_stages)
 
 
@@ -553,6 +556,7 @@ def train(
         num_heads: int = None,
         ff_dim: int = None,
         n_positions: int = 512,
+        d_model: int = 512,
         dropout: float = 0.1,
 
         # Training Params
@@ -593,6 +597,7 @@ def train(
             'num_heads': num_heads,
             'ff_dim': ff_dim,
             'n_positions': n_positions,
+            'd_model': d_model,
             'dropout': dropout,
 
             # Training Params
@@ -626,6 +631,7 @@ def train(
         num_heads = hparams.get('num_heads', num_heads)
         ff_dim = hparams.get('ff_dim', ff_dim)
         n_positions = hparams.get('n_positions', n_positions)
+        d_model = hparams.get('d_model', d_model)
         dropout = hparams.get('dropout', dropout)
 
         # Training Params
@@ -683,13 +689,14 @@ def train(
     t5_utils.log_dist('Creating Datasets', ranks=[0], level=t5_utils.logging.INFO)
     dataset = t5_utils.create_dataset(tokenizer=tokenizer, dataset_dir=dataset_dir, mask_prob=mask_prob,
                                       random_replace_span=random_replace_span, max_seq_length=max_seq_length)
-    collate_fn = create_collate_fn(tokenizer)
+    collate_fn = create_collate_fn(tokenizer, max_length=max_seq_length)
     t5_utils.log_dist('Dataset Creation Done with length: {}'.format(len(dataset)), ranks=[0],
                       level=t5_utils.logging.INFO)
 
     t5_utils.log_dist('Creating Model', ranks=[0], level=t5_utils.logging.INFO)
+    t5_patch.t5_performance_optimize()
     model = create_pipeline_model(num_stage, tokenizer.added_tokens_encoder['<decoder>'],
-                                  dropout, n_positions, num_layers, num_heads, ff_dim)
+                                  dropout, n_positions, num_layers, num_heads, ff_dim, d_model)
     model, _, _, _ = deepspeed.initialize(model=model, model_parameters=model.parameters(), config=ds_config,
                                           training_data=dataset, collate_fn=collate_fn)
     # Curriculum Learning batch function
