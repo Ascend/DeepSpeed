@@ -24,7 +24,6 @@ from typing import Tuple, List, Optional, Union
 
 
 def collate_function(batch: List[Tuple[List[int], List[int]]], pad_token_id: int, max_length: int):
-    # max_length = 1024
     padded_token_ids = [token_ids + [pad_token_id for _ in range(0, max_length - len(token_ids))]
                         for token_ids, _ in batch]
     padded_labels = [labels + [pad_token_id for _ in range(0, max_length - len(labels))] for _, labels in batch]
