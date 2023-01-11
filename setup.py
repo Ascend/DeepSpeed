@@ -6,6 +6,7 @@ setuptools.setup(
     description="An adaptor for deepspeed on Ascend NPU",
     packages=['deepspeed_npu'],
     install_package_data=True,
+    include_package_data=True,
     license='Apache2',
     license_file='./LICENSE',
     classifiers=[

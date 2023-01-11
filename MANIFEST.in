@@ -1,0 +1,1 @@
+recursive-include deepspeed_npu *.cpp *.h
