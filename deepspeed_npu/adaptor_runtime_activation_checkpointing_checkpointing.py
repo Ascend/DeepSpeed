@@ -7,7 +7,7 @@ from torch.cuda import _lazy_call, device as device_ctx_manager
 from deepspeed.runtime.activation_checkpointing.checkpointing import SYNCHRONIZE, PROFILE_TIME, \
     CONTIGUOUS_CHECKPOINTING, CPU_CHECKPOINT, PARTITION_ACTIVATIONS, cuda_device, transport_stream, \
     gather_partitioned_activations, detach_variable, merge_tensors, get_cuda_rng_tracker, \
-    is_activation_tocheckpoint, extract_tensors
+    is_activation_to_checkpoint, extract_tensors
 from deepspeed.runtime.utils import copy_to_device, move_to_device, see_memory_usage, bwc_tensor_model_parallel_rank
 
 global OVERFLOW_FLAG

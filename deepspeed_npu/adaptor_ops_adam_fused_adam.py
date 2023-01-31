@@ -113,7 +113,7 @@ class FusedAdamNPU(torch.optim.Optimizer):
                 max_exp_avg_sq_tmp.copy_(state['max_exp_avg_sq'])
                 state['max_exp_avg_sq'] = max_exp_avg_sq_tmp
 
-    def zero_grad(self):
+    def zero_grad(self, set_to_none: bool = False):
         for combined_state in self.combined_states:
             combined_state['grads'].zero_()
 
@@ -140,6 +140,9 @@ class FusedAdamNPU(torch.optim.Optimizer):
 
         bias_correction1 = 1 - beta1 ** self.combined_states[group_index]['step']
         bias_correction2 = 1 - beta2 ** self.combined_states[group_index]['step']
+
+        if not self.adam_w_mode and group['weight_decay'] != 0:
+            combined_grads = combined_grads.add(combined_params, alpha=group['weight_decay'])
 
         # Decay the first and second moment running average coefficient
         exp_avg.mul_(beta1).add_(combined_grads, alpha=1 - beta1)

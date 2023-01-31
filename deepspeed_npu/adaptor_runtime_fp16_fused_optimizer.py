@@ -155,7 +155,7 @@ def Fp16OptimizerStep(self, closure=None):
                 self.fp32_params_combine_groups.append(combine_npu(tmp_param))
                 self.fp32_grads_combine_groups.append(combine_npu(tmp_grad))
             else:
-                # fp32 wad combined in optimizer, if you do combination again,
+                # fp32 was combined in optimizer, if you do combination again,
                 # the data ptr will be changed, so just get from optimizer
                 self.fp32_params_combine_groups.append(self.optimizer.combined_states[i]['params'])
                 self.fp32_grads_combine_groups.append(self.optimizer.combined_states[i]['grads'])
@@ -182,7 +182,7 @@ def Fp16OptimizerStep(self, closure=None):
     for i, group in enumerate(self.fp16_groups):
         # grads_for_norm, _ = split_params_grads_into_shared_and_expert_params(group)
         norm_group_value = 0.0
-        if len(self.fp32_params_combine_groups[i]) > 0:
+        if len(self.fp16_params_combine_groups[i]) > 0:
             norm_group_value = self.get_combine_weight_norm(self.fp16_params_combine_groups[i])
         norm_groups.append(norm_group_value)
 
@@ -224,7 +224,7 @@ def unscale_and_clip_grads(self, total_norm, apply_scale=True):
     return combined_scale
 
 
-def get_combine_weight_norm(parameters, norm_type=2, mpu=None):
+def get_combine_weight_norm(self, parameters, norm_type=2, mpu=None):
     total_norm = 0.
 
     param_norm = parameters.data.float().norm(norm_type)
