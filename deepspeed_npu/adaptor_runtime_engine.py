@@ -2,10 +2,23 @@ import hashlib
 import torch
 import torch.distributed as dist
 from deepspeed.runtime import engine
-from deepspeed.utils import logger
+from deepspeed.utils import logger, log_dist
+from deepspeed_npu.adaptor_ops_adam_fused_adam import FusedAdamNPU
 from deepspeed.runtime.config import DeepSpeedConfig, DEEPSPEED_OPTIMIZERS, \
     ADAGRAD_OPTIMIZER, ADAM_OPTIMIZER, ADAMW_OPTIMIZER, LAMB_OPTIMIZER, ONEBIT_ADAM_OPTIMIZER, ONEBIT_LAMB_OPTIMIZER, \
     TORCH_ADAM_PARAM, ADAM_W_MODE, ADAM_W_MODE_DEFAULT
+from deepspeed.runtime.fp16.fused_optimizer import FP16_Optimizer
+from deepspeed.runtime.fp16.unfused_optimizer import FP16_UnfusedOptimizer
+
+
+try:
+    import apex
+    from apex import amp
+    APEX_INSTALLED = True
+except ImportError:
+    # Fail silently so we don't spam logs unnecessarily if user isn't using amp
+    APEX_INSTALLED = False
+    pass
 
 
 def split_half_float_double_sparse(tensors):
@@ -70,12 +83,10 @@ def _configure_basic_optimizer(self, model_parameters):
                                                     **optimizer_parameters,
                                                     adamw_mode=effective_adam_w_mode)
             else:
-                # ASCEND VOID OPT
-                # from deepspeed.ops.adam import FusedAdam
-
-                optimizer = torch.optim.Adam(
+                optimizer = FusedAdamNPU(
                     model_parameters,
                     **optimizer_parameters,
+                    adam_w_mode=effective_adam_w_mode
                 )
 
     elif self.optimizer_name() == LAMB_OPTIMIZER:
@@ -136,5 +147,63 @@ def _checkpoint_tag_validation(self, tag):
         elif not valid:
             logger.warning(msg)
 
+
+def _configure_fp16_optimizer(self, optimizer):
+    initial_dynamic_scale = self.initial_dynamic_scale()
+    dynamic_loss_args = self.dynamic_loss_scale_args()
+    clip_grad = self.gradient_clipping()
+    if APEX_INSTALLED:
+        fused_opts = (apex.optimizers.FusedAdam, FusedAdamNPU)
+    else:
+        fused_opts = FusedAdamNPU
+
+    if isinstance(optimizer, fused_opts) \
+            or self.optimizer_name() == ONEBIT_ADAM_OPTIMIZER:
+        if self.dynamic_loss_scale():
+            log_dist("Creating fp16 optimizer with dynamic loss scale", ranks=[0])
+            timers = self.timers if self.wall_clock_breakdown() else None
+            optimizer = FP16_Optimizer(
+                optimizer,
+                deepspeed=self,
+                dynamic_loss_scale=True,
+                initial_dynamic_scale=initial_dynamic_scale,
+                dynamic_loss_args=dynamic_loss_args,
+                mpu=self.mpu,
+                clip_grad=clip_grad,
+                fused_adam_legacy=self.optimizer_legacy_fusion(),
+                timers=timers,
+            )
+        else:
+            log_dist(
+                "Creating fp16 optimizer with static loss scale: {}".format(
+                    self.loss_scale()),
+                ranks=[0],
+            )
+            optimizer = FP16_Optimizer(
+                optimizer,
+                deepspeed=self,
+                static_loss_scale=self.loss_scale(),
+                mpu=self.mpu,
+                clip_grad=clip_grad,
+                fused_adam_legacy=self.optimizer_legacy_fusion(),
+            )
+    else:
+        log_dist("Creating fp16 unfused optimizer with dynamic loss scale",
+                 ranks=[0])
+        optimizer = FP16_UnfusedOptimizer(
+            optimizer,
+            deepspeed=self,
+            static_loss_scale=self.loss_scale(),
+            dynamic_loss_scale=self.dynamic_loss_scale(),
+            dynamic_loss_args=dynamic_loss_args,
+            mpu=self.mpu,
+            clip_grad=clip_grad,
+            fused_lamb_legacy=self.optimizer_name() == LAMB_OPTIMIZER,
+        )
+
+    return optimizer
+
+
 engine.DeepSpeedEngine._configure_basic_optimizer = _configure_basic_optimizer
 engine.DeepSpeedEngine._checkpoint_tag_validation = _checkpoint_tag_validation
+engine.DeepSpeedEngine._configure_fp16_optimizer = _configure_fp16_optimizer
