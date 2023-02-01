@@ -195,7 +195,7 @@ def Fp16OptimizerStep(self, closure=None):
 
     self.optimizer.step()
 
-    for i, group in self.fp32_params_combine_groups:
+    for i, group in enumerate(self.fp32_params_combine_groups):
         self.fp32_grads_combine_groups[i].data.zero_()
         self.fp16_params_combine_groups[i].data.copy_(group.data)
 
