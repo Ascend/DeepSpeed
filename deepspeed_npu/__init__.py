@@ -3,10 +3,12 @@ import torch_npu
 from torch_npu.contrib import transfer_to_npu
 from . import adaptor_utils
 from . import adaptor_moe_shared_moe
+from . import adaptor_ops_adam_fused_adam
 from . import adaptor_ops_op_builder_cpu_adam
 from . import adaptor_ops_op_builder_builder
 from . import adaptor_runtime_pipe_engine
 from . import adaptor_runtime_pipe_module
+from . import adaptor_runtime_activation_checkpointing_checkpointing
 from . import adaptor_runtime_comm_coalesced_collectives
 from . import adaptor_runtime_fp16_fused_optimizer
 from . import adaptor_runtime_fp16_loss_scaler
