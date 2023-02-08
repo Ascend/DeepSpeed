@@ -3,10 +3,12 @@
 通过deepspeed_npu，你可以在Ascend910芯片上使用deepspeed，并基于deepspeed进行开发。目前，deepspeed_npu主要支持以下特性
 
 1. fp16
-2. pipeline并行
+2. Pipeline Parallelism
 3. ZeRO（stage1-stage3）
-4. one-bit Adam
-5. MoE
+4. ZeRO-Offload
+5. One-bit Adam
+6. MoE
+7. Activation checkpointing
 
 请参考deepspeed官方文档获取这些特性的详细说明：https://www.deepspeed.ai/
 
