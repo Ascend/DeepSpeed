@@ -1,5 +1,26 @@
+import shutil
+import subprocess
+from numpy import require
+import pkg_resources
 import setuptools
-import pathlib
+from setuptools.command.install import install as _install
+
+
+def _post_install():
+    p = subprocess.Popen('which deepspeed', stdout=subprocess.PIPE, shell=True)
+    dp_bin_path = p.communicate()[0].decode('utf-8').strip()
+    shutil.copyfile('bin/deepspeed', dp_bin_path)
+
+class PostInstall(_install):
+    def run(self):
+        _install.run(self)
+        self.execute(_post_install, msg="Copy deepspeed bin...")
+
+required_dp_ver = '0.6.0'
+if pkg_resources.get_distribution("deepspeed").version != required_dp_ver:
+    raise RuntimeError('deepspeed version should be {}, installation will stop...'.format(required_dp_ver))
+
+
 setuptools.setup(
     name="deepspeed_npu",
     version="0.1",
@@ -18,4 +39,5 @@ setuptools.setup(
         "Programming Language :: Python :: 3.9",        
     ],
     python_requires=">=3.7",
+    cmdclass={'install': PostInstall}
 )

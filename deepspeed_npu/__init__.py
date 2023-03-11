@@ -2,6 +2,7 @@ import torch
 import torch_npu
 from torch_npu.contrib import transfer_to_npu
 from . import adaptor_utils
+from . import adaptor_launcher_runner
 from . import adaptor_moe_shared_moe
 from . import adaptor_ops_adam_fused_adam
 from . import adaptor_ops_op_builder_cpu_adam
