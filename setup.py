@@ -14,7 +14,7 @@ def _post_install():
 class PostInstall(_install):
     def run(self):
         _install.run(self)
-        self.execute(_post_install, msg="Copy deepspeed bin...")
+        _post_install()
 
 required_dp_ver = '0.6.0'
 if pkg_resources.get_distribution("deepspeed").version != required_dp_ver:
