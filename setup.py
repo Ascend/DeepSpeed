@@ -12,7 +12,7 @@ def _post_install():
     if not os.path.isfile(dp_bin_path):
         raise RuntimeError('deepspeed executable file not found, installation will stop...')
     shutil.copyfile('bin/deepspeed', dp_bin_path)
-    shutil.copyfile('bin/ds', os.path.join(dp_bin_path.split('/')[:-1]))
+    shutil.copyfile('bin/ds', os.path.join('/', *dp_bin_path.split('/')[:-1]), 'ds')
 
 class PostInstall(_install):
     def run(self):
