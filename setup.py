@@ -14,7 +14,7 @@ def _post_install():
             'deepspeed executable file was not found, installation will stop. Please replace it with the provided "bin/deepspeed" by yourself.'
         )
     shutil.copyfile('bin/deepspeed', dp_bin_path)
-    shutil.copyfile('bin/ds', os.path.join(dp_bin_path.split('/')[:-1]))
+    shutil.copyfile('bin/ds', os.path.join('/', *dp_bin_path.split('/')[:-1], 'ds'))
 
 class PostInstall(_install):
     def run(self):
