@@ -18,14 +18,21 @@
 
 ### 2.安装方法
 
-安装原生deepspeed，并下载安装deepspeed_npu插件
+1.先安装原生deepspeed
 
 ```
 pip3 install deepspeed==0.6.0
-git clone https://gitee.com/ascend/DeepSpeed.git -b adaptor
+```
+
+2.然后安装deepspeed-npu插件
+
+```
+git clone https://gitee.com/ascend/DeepSpeed.git
 cd DeepSpeed
 pip3 install ./
 ```
+
+***注：deepspeed-npu安装后会修改命令行deepspeed和ds，请按照顺序安装，并使用匹配的版本。***
 
 ### 3.插件使用方法
 
