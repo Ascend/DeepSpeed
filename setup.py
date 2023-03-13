@@ -10,7 +10,9 @@ def _post_install():
     p = subprocess.Popen('which deepspeed', stdout=subprocess.PIPE, shell=True)
     dp_bin_path = p.communicate()[0].decode('utf-8').strip()
     if not os.path.isfile(dp_bin_path):
-        raise RuntimeError('deepspeed executable file not found, installation will stop...')
+        raise RuntimeError(
+            'deepspeed executable file was not found, installation will stop. Please replace it with the provided "bin/deepspeed" by yourself.'
+        )
     shutil.copyfile('bin/deepspeed', dp_bin_path)
     shutil.copyfile('bin/ds', os.path.join(dp_bin_path.split('/')[:-1]))
 
@@ -38,7 +40,7 @@ setuptools.setup(
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",        
+        "Programming Language :: Python :: 3.9",
     ],
     python_requires=">=3.7",
     cmdclass={'install': PostInstall}
