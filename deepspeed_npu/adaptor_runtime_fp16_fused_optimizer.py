@@ -182,8 +182,8 @@ def Fp16OptimizerStep(self, closure=None):
     for i, group in enumerate(self.fp16_groups):
         # grads_for_norm, _ = split_params_grads_into_shared_and_expert_params(group)
         norm_group_value = 0.0
-        if len(self.fp16_params_combine_groups[i]) > 0:
-            norm_group_value = self.get_combine_weight_norm(self.fp16_params_combine_groups[i])
+        if len(self.fp16_grads_combine_groups[i]) > 0:
+            norm_group_value = self.get_combine_weight_norm(self.fp16_grads_combine_groups[i])
         norm_groups.append(norm_group_value)
 
         self.fp32_grads_combine_groups[i].data.copy_(
