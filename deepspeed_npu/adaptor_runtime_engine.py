@@ -83,11 +83,12 @@ def _configure_basic_optimizer(self, model_parameters):
                                                     **optimizer_parameters,
                                                     adamw_mode=effective_adam_w_mode)
             else:
-                optimizer = FusedAdamNPU(
-                    model_parameters,
-                    **optimizer_parameters,
-                    adam_w_mode=effective_adam_w_mode
-                )
+                if not effective_adam_w_mode:
+                    optimizer = torch.optim.Adam(model_parameters,
+                                                    **optimizer_parameters)
+                else:
+                    optimizer = torch.optim.AdamW(model_parameters,
+                                                    **optimizer_parameters)
 
     elif self.optimizer_name() == LAMB_OPTIMIZER:
         '''
