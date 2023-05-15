@@ -2,7 +2,7 @@ from typing import Deque, Dict, Iterable, Set, Tuple, List
 import sys
 import torch
 from torch import Tensor
-from torch._six import inf
+from math import inf
 from torch.nn import Parameter
 import torch.distributed as dist
 from deepspeed.runtime.utils import is_model_parallel_parameter

@@ -1,7 +1,7 @@
 import sys
 import torch
 import torch_npu
-from torch._six import inf
+from math import inf
 import torch.distributed as dist
 from torch.distributed.distributed_c10d import _get_global_rank
 from deepspeed.runtime.zero import stage_1_and_2
