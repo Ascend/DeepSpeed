@@ -1,7 +1,7 @@
 import sys
 import torch
 import torch.distributed as dist
-from torch._six import inf
+from math import inf
 from deepspeed.runtime import utils
 from deepspeed.runtime.utils import bwc_tensor_model_parallel_rank
 from deepspeed.utils import groups
