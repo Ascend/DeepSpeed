@@ -1,19 +1,19 @@
 import torch
 import torch_npu
+
 import deepspeed.runtime.activation_checkpointing.checkpointing
 
 from torch import _C
 from torch.cuda import _lazy_call, device as device_ctx_manager
-from deepspeed.runtime.activation_checkpointing.checkpointing import SYNCHRONIZE, PROFILE_TIME, \
-    CONTIGUOUS_CHECKPOINTING, CPU_CHECKPOINT, PARTITION_ACTIVATIONS, cuda_device, transport_stream, \
-    gather_partitioned_activations, detach_variable, merge_tensors, get_cuda_rng_tracker, \
-    is_activation_to_checkpoint, extract_tensors
-from deepspeed.runtime.utils import copy_to_device, move_to_device, see_memory_usage, bwc_tensor_model_parallel_rank
+from deepspeed.accelerator import get_accelerator
+from deepspeed.runtime.activation_checkpointing.checkpointing import (gather_partitioned_activations, CPU_CHECKPOINT,
+    detach_variable, is_activation_to_checkpoint, merge_tensors, get_cuda_rng_tracker, _set_cuda_rng_state,
+    extract_tensors)
+from deepspeed.runtime.utils import (copy_to_device, move_to_device, see_memory_usage, bwc_tensor_model_parallel_rank)
 
-global OVERFLOW_FLAG
-OVERFLOW_FLAG = None
-CLEAR_STATUS = None
-FLOAT_STATUS = None
+CKPT_INIT_FLAG = False
+CKPT_OVERFLOW_FLAG = False
+CKPT_CONST_VAR = None
 
 
 def backward(ctx, *grads):
@@ -22,24 +22,24 @@ def backward(ctx, *grads):
     # removing pointers to the contiguous buffer memory
     # so that they can be garbage collected once the checkpoints
     # have been used
-    if SYNCHRONIZE:
-        torch.cuda.synchronize()
-    if PROFILE_TIME:
+    if deepspeed.runtime.activation_checkpointing.checkpointing.SYNCHRONIZE:
+        get_accelerator().synchronize()
+    if deepspeed.runtime.activation_checkpointing.checkpointing.PROFILE_TIME:
         timers('backward').start()
 
-    if CONTIGUOUS_CHECKPOINTING:
+    if deepspeed.runtime.activation_checkpointing.checkpointing.CONTIGUOUS_CHECKPOINTING:
         global data_offsets, size_offsets
         global contiguous_data_buffers, contiguous_size_buffers
 
-        for buffers in contiguous_data_buffers:
+        for buffers in deepspeed.runtime.activation_checkpointing.checkpointing.contiguous_data_buffers:
             buffers = []
 
         # frees up all the pointers to the checkpoints except for the ones
         # stored by save for backward
-        contiguous_data_buffers = []
-        contiguous_size_buffers = []
-        data_offsets = []
-        size_offsets = []
+        deepspeed.runtime.activation_checkpointing.checkpointing.contiguous_data_buffers = []
+        deepspeed.runtime.activation_checkpointing.checkpointing.contiguous_size_buffers = []
+        deepspeed.runtime.activation_checkpointing.checkpointing.data_offsets = []
+        deepspeed.runtime.activation_checkpointing.checkpointing.size_offsets = []
 
     see_memory_usage("In backward checkpointing code", force=False)
     if not torch.autograd._is_checkpoint_valid():
@@ -48,16 +48,14 @@ def backward(ctx, *grads):
 
     global cuda_device, transport_stream, PARTITION_ACTIVATIONS
 
-    if PARTITION_ACTIVATIONS:
-        # with torch.cuda.stream(transport_stream):
+    if deepspeed.runtime.activation_checkpointing.checkpointing.PARTITION_ACTIVATIONS:
+        # with get_accelerator().stream(transport_stream):
         inputs = gather_partitioned_activations(
             ctx.deepspeed_saved_tensors,
-            device=cuda_device if CPU_CHECKPOINT else None)
+            device=cuda_device if deepspeed.runtime.activation_checkpointing.checkpointing.CPU_CHECKPOINT else None)
         detached_inputs = detach_variable(inputs)
-    elif CPU_CHECKPOINT:
-        inputs = move_to_device(ctx.deepspeed_saved_tensors,
-                                cuda_device,
-                                is_activation_to_checkpoint)
+    elif deepspeed.runtime.activation_checkpointing.checkpointing.CPU_CHECKPOINT:
+        inputs = move_to_device(ctx.deepspeed_saved_tensors, cuda_device, is_activation_to_checkpoint)
         detached_inputs = detach_variable(inputs)
     else:
         inputs = ctx.deepspeed_saved_tensors
@@ -70,7 +68,7 @@ def backward(ctx, *grads):
 
     # Store the current states.
     bwd_cpu_rng_state = torch.get_rng_state()
-    bwd_cuda_rng_state = torch.cuda.get_rng_state()
+    bwd_cuda_rng_state = get_accelerator().get_rng_state()
     bwd_cuda_rng_state_tracker = get_cuda_rng_tracker().get_states()
 
     # Set the states to what it used to be before the forward pass.
@@ -79,18 +77,20 @@ def backward(ctx, *grads):
     get_cuda_rng_tracker().set_states(ctx.fwd_cuda_rng_state_tracker)
 
     # if PARTITION_ACTIVATIONS:
-    #     current_stream=torch.cuda.current_stream()
+    #     current_stream=get_accelerator().current_stream()
     #     current_stream.wait_stream(transport_stream)
 
     see_memory_usage("In backward checkpointing code before forward", force=False)
 
-    global OVERFLOW_FLAG, CLEAR_STATUS, FLOAT_STATUS
-    torch_npu.npu_get_float_status(FLOAT_STATUS)
-    OVERFLOW_FLAG = OVERFLOW_FLAG + FLOAT_STATUS[0]
+    global CKPT_INIT_FLAG, CKPT_OVERFLOW_FLAG, CKPT_CONST_VAR
+    if not CKPT_INIT_FLAG:
+        CKPT_INIT_FLAG = True
+        CKPT_CONST_VAR = torch.tensor([65504.], dtype=torch.float16).npu()
 
+    CKPT_OVERFLOW_FLAG = torch_npu.npu.get_npu_overflow_flag()
     with torch.enable_grad():
         outputs = ctx.run_function(*detached_inputs)
-        torch_npu.npu_clear_float_status(CLEAR_STATUS)
+        torch_npu.npu.clear_npu_overflow_flag()
 
     see_memory_usage("In backward checkpointing code after forward", force=False)
     # Set the states back to what it was at the start of this function.
@@ -125,11 +125,11 @@ def backward(ctx, *grads):
 
     see_memory_usage("After backward checkpointing code after backward", force=False)
 
-    if PROFILE_TIME:
+    if deepspeed.runtime.activation_checkpointing.checkpointing.PROFILE_TIME:
         timers('backward').stop()
         timers.log(['backward'])
-    if SYNCHRONIZE:
-        torch.cuda.synchronize()
+    if deepspeed.runtime.activation_checkpointing.checkpointing.SYNCHRONIZE:
+        get_accelerator().synchronize()
     ret_list = [None, None]  # first None for ctx
     for inp in detached_inputs:
         if torch.is_tensor(inp):
@@ -137,50 +137,11 @@ def backward(ctx, *grads):
         else:
             ret_list.append(None)
 
+    temp = torch_npu.npu.get_npu_overflow_flag()
+    CKPT_OVERFLOW_FLAG = CKPT_OVERFLOW_FLAG or temp
+    CKPT_CONST_VAR + CKPT_OVERFLOW_FLAG * 10000
+
     return tuple(ret_list)
 
 
-def _set_cuda_rng_state(new_state, device=-1):
-    if hasattr(_C, '_cuda_setRNGState') and callable(_C._cuda_setRNGState):
-        # older PyTorch
-        def cb():
-            with device_ctx_manager(device):
-                _C._cuda_setRNGState(new_state)
-    else:
-        # newer PyTorch
-        if device == -1:
-            device = torch.device('cuda')
-        elif isinstance(device, str):
-            device = torch.device(device)
-        elif isinstance(device, int):
-            device = torch.device('cuda', device)
-
-        def cb():
-            idx = device.index
-            if idx is None:
-                idx = torch.cuda.current_device()
-            default_generator = torch.npu.default_generators[idx]  # not replace with torch_npu?
-            default_generator.set_state(new_state)
-
-    _lazy_call(cb)
-
-
-def _configure_defaults():
-    deepspeed.runtime.activation_checkpointing.checkpointing.PARTITION_ACTIVATIONS = False
-    deepspeed.runtime.activation_checkpointing.checkpointing.CONTIGUOUS_CHECKPOINTING = False
-    deepspeed.runtime.activation_checkpointing.checkpointing.num_layers = False
-    deepspeed.runtime.activation_checkpointing.checkpointing.CPU_CHECKPOINT = False
-    deepspeed.runtime.activation_checkpointing.checkpointing.SYNCHRONIZE = False
-    deepspeed.runtime.activation_checkpointing.checkpointing.PROFILE_TIME = False
-    deepspeed.runtime.activation_checkpointing.checkpointing.deepspeed_checkpointing_enabled = True
-
-    global OVERFLOW_FLAG, CLEAR_STATUS, FLOAT_STATUS
-
-    OVERFLOW_FLAG = torch.npu.IntTensor([0], device=torch.npu.current_device())
-    CLEAR_STATUS = torch.zeros(8, device=torch.npu.current_device())
-    FLOAT_STATUS = torch.zeros(8, device=torch.npu.current_device())
-
-
 deepspeed.runtime.activation_checkpointing.checkpointing.CheckpointFunction.backward = backward
-deepspeed.runtime.activation_checkpointing.checkpointing._set_cuda_rng_state = _set_cuda_rng_state
-deepspeed.runtime.activation_checkpointing.checkpointing._configure_defaults = _configure_defaults

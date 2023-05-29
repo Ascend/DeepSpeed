@@ -27,7 +27,7 @@ class PipelineEngineNPU(PipelineEngine):
         if checkpointing.OVERFLOW_FLAG is not None:
             checkpointing.OVERFLOW_FLAG.data[0] = 0
         checkpointing.FLOAT_STATUS = torch.zeros(8, device=torch.npu.current_device())
-        torch_npu.npu_clear_float_status(torch.zeros(8, device=torch.npu.current_device()))
+        torch_npu.npu.npu_clear_float_status(torch.zeros(8, device=torch.npu.current_device()))
         super()._exec_backward_pass(buffer_id)
 
     def _exec_load_micro_batch(self, buffer_id):

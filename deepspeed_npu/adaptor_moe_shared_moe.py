@@ -7,8 +7,8 @@ import torch.distributed as dist
 import torch.nn.functional as F
 from typing import Any, Tuple, cast, Optional
 from deepspeed.moe import sharded_moe
-from deepspeed.moe.sharded_moe import gumbel_rsample, _capacity, einsum, \
-    exp_selection_uniform_map, _top_idx, _one_hot_to_float, TUTEL_INSTALLED
+from deepspeed.moe.sharded_moe import (gumbel_rsample, _capacity, einsum, exp_selection_uniform_map, _top_idx,
+                                       _one_hot_to_float, TUTEL_INSTALLED)
 
 try:
     # To enable Tutel MoE optimizations:

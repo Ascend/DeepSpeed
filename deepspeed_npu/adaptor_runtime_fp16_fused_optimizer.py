@@ -127,7 +127,7 @@ def initialize_optimizer_states(self):
 
 
 def Fp16OptimizerBackward(self, loss, create_graph=False, retain_graph=False):
-    torch_npu.npu_clear_float_status(torch.zeros(8, device=torch.npu.current_device()))
+    torch_npu.npu.npu_clear_float_status(torch.zeros(8, device=torch.npu.current_device()))
     scaled_loss = (loss.float()) * self.cur_scale
     scaled_loss.backward(create_graph=create_graph, retain_graph=retain_graph)
 
@@ -238,7 +238,7 @@ def get_combine_weight_norm(self, parameters, norm_type=2, mpu=None):
                                      group=mpu.get_model_parallel_group())
     total_norm = total_norm_npu[0].item()**(1. / norm_type)
 
-    overflow = torch._amp_foreach_non_finite_check_([total_norm_npu])
+    overflow = torch_npu._amp_foreach_non_finite_check_([total_norm_npu])
 
     if overflow or total_norm == float('inf') or total_norm == -float('inf') or total_norm != total_norm:
         total_norm = -1
