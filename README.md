@@ -14,14 +14,14 @@
 
 ### 1.版本说明
 
-目前仅支持deepspeed版本0.6.0：https://github.com/microsoft/DeepSpeed/tree/v0.6.0
+目前仅支持deepspeed版本0.9.2：https://github.com/microsoft/DeepSpeed/tree/v0.9.2
 
 ### 2.安装方法
 
 1.先安装原生deepspeed
 
 ```
-pip3 install deepspeed==0.6.0
+pip3 install deepspeed==0.9.2
 ```
 
 2.然后安装deepspeed-npu插件

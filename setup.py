@@ -21,7 +21,7 @@ class PostInstall(_install):
         _install.run(self)
         _post_install()
 
-required_dp_ver = '0.6.0'
+required_dp_ver = '0.9.2'
 if pkg_resources.get_distribution("deepspeed").version != required_dp_ver:
     raise RuntimeError('deepspeed version should be {}, installation will stop...'.format(required_dp_ver))
 
