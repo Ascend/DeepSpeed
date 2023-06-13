@@ -127,7 +127,7 @@ def initialize_optimizer_states(self):
 
 
 def Fp16OptimizerBackward(self, loss, create_graph=False, retain_graph=False):
-    torch_npu.npu_clear_float_status(torch.zeros(8, device=torch.npu.current_device()))
+    torch.npu.clear_npu_overflow_flag()
     scaled_loss = (loss.float()) * self.cur_scale
     scaled_loss.backward(create_graph=create_graph, retain_graph=retain_graph)
 

@@ -1,7 +1,10 @@
 import sys
 import torch
 import torch.distributed as dist
-from math import inf
+try:
+    from torch._six import inf
+except ModuleNotFoundError:
+    from torch import inf
 from deepspeed.runtime import utils
 from deepspeed.runtime.utils import bwc_tensor_model_parallel_rank
 from deepspeed.utils import groups
@@ -37,7 +40,7 @@ def check_using_norm(self, norm_group, reduce_overflow=True):
 def has_overflow_serial(self, params):
     grads = [p.grad.data for p in params if p.grad is not None]
     res = torch._amp_foreach_non_finite_check_(grads)
-    return res or bool(checkpointing.OVERFLOW_FLAG[0]) if checkpointing.OVERFLOW_FLAG is not None else False
+    return res
 
 def has_overflow(self, params, has_moe_params=None):
     if has_moe_params is None:

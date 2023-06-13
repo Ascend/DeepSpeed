@@ -1,7 +1,6 @@
 import sys
 import torch
 import torch_npu
-import deepspeed_npu.adaptor_runtime_activation_checkpointing_checkpointing as checkpointing
 from torch_npu.npu import clear_npu_overflow_flag
 from deepspeed.runtime.pipe.engine import _tensor_bytes, PipelineEngine
 from deepspeed.runtime.pipe import p2p, schedule
@@ -23,11 +22,7 @@ class PipelineEngineNPU(PipelineEngine):
     ]
 
     def _exec_backward_pass(self, buffer_id):
-        # clear_npu_overflow_flag()
-        if checkpointing.OVERFLOW_FLAG is not None:
-            checkpointing.OVERFLOW_FLAG.data[0] = 0
-        checkpointing.FLOAT_STATUS = torch.zeros(8, device=torch.npu.current_device())
-        torch_npu.npu_clear_float_status(torch.zeros(8, device=torch.npu.current_device()))
+        clear_npu_overflow_flag()
         super()._exec_backward_pass(buffer_id)
 
     def _exec_load_micro_batch(self, buffer_id):

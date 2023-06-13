@@ -1,7 +1,10 @@
 import sys
 import torch
 import torch_npu
-from math import inf
+try:
+    from torch._six import inf
+except ModuleNotFoundError:
+    from torch import inf
 import torch.distributed as dist
 from torch.distributed.distributed_c10d import _get_global_rank
 from deepspeed.runtime.zero import stage_1_and_2
@@ -132,10 +135,6 @@ class DeepSpeedZeroOptimizerNpu(stage_1_and_2.DeepSpeedZeroOptimizer):
                 for idx in range(len(partition_ids_w_offsets)):
                     partition_id, offset = partition_ids_w_offsets[idx]
 
-                    # if dist.get_rank() == 0 and count < 100:
-                    #     print(f"Rank {dist.get_rank()} rank offset id {idx} calculated dp size {dist.get_world_size(group=process_group)} real dp size {dist.get_world_size(self.real_dp_process_group[i])} and dst: {partition_id}")
-                    # count += 1
-
                     # Calculate numel for grad slice depending on partition location
                     if idx == len(partition_ids_w_offsets) - 1:
                         # Last partition_id uses its own offset
@@ -160,27 +159,16 @@ class DeepSpeedZeroOptimizerNpu(stage_1_and_2.DeepSpeedZeroOptimizer):
             async_handles = []
             for i, (dst, bucket_offset, numel) in enumerate(rank_and_offsets):
                 grad_slice = tensor.narrow(0, int(bucket_offset), int(numel))
-                # if dist.get_rank() == 0:
-                #     print(f"Rank {dist.get_rank()} rank offset id {i} real dp size {dist.get_world_size(group=real_dp_process_group[i])} and dst: {dst}")
-                # dist.barrier()
-                #dist.barrier()
 
                 dst_rank = _get_global_rank(real_dp_process_group[i], dst)
-                # async_handle = dist.reduce(grad_slice,
-                #                            dst=dst_rank,
-                #                            group=real_dp_process_group[i],
-                #                            async_op=True)
-                # ASCEND AVOID
+
                 tmp = grad_slice.clone()
                 async_handle = dist.reduce(tmp,
                                            dst=dst_rank,
                                            group=real_dp_process_group[i],
                                            async_op=False)
                 grad_slice.data.copy_(tmp)
-                #async_handles.append(async_handle)
 
-            #for handle in async_handles:
-                #handle.wait()
 
     def update_overflow_tracker_for_param_grad(self, param):
         if param.grad is not None:
@@ -334,8 +322,7 @@ class DeepSpeedZeroOptimizerNpu(stage_1_and_2.DeepSpeedZeroOptimizer):
             total_norm = total_norm_npu[0].item()
         else:
             total_norm = 0.0
-            # if dist.get_rank() == 0:
-            #    logger.info(f"Total Norm beginning {total_norm}")
+
             for g, p in zip(gradients, params):
                 # Pipeline parallelism may replicate parameters. Avoid multi-counting.
                 if hasattr(p, 'ds_pipe_replicated') and p.ds_pipe_replicated:
