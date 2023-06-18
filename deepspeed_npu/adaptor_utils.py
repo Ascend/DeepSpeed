@@ -1,5 +1,6 @@
 import copy
 import torch
+import torch_npu
 
 from functools import wraps
 from deepspeed import comm as dist
@@ -29,11 +30,11 @@ def wrapper_dist_send(fn):
             args[0] = args[0].int()
 
         if args[0].dim() == 4:
-            args[0] = args[0].npu_format_cast(0)
+            args[0] = torch_npu.npu_format_cast(args[0], 0)
         elif args[0].dim() == 5:
-            args[0] = args[0].npu_format_cast(30)
+            args[0] = torch_npu.npu_format_cast(args[0], 30)
         else:
-            args[0] = args[0].npu_format_cast(2)
+            args[0] = torch_npu.npu_format_cast(args[0], 2)
         return fn(*args, **kwargs)
     
     return wrapper

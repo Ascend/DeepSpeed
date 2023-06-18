@@ -1,6 +1,7 @@
 from functools import wraps
 import sys
 import torch
+import torch_npu
 import deepspeed
 from torch import Tensor
 import torch.distributed as dist
@@ -30,11 +31,11 @@ class _AllToAll(torch.autograd.Function):
         # ASCEND AVOID
         input = input.contiguous()
         if input.dim() == 4:
-            input = input.npu_format_cast(0)
+            input = torch_npu.npu_format_cast(input, 0)
         elif input.dim() == 5:
-            input = input.npu_format_cast(30)
+            input = torch_npu.npu_format_cast(input, 30)
         else:
-            input = input.npu_format_cast(2)
+            input = torch_npu.npu_format_cast(input, 2)
         output = torch.empty_like(input)
         dist.all_to_all_single(output, input, group=group)
         return output

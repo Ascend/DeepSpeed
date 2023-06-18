@@ -20,6 +20,6 @@ from . import adaptor_runtime_utils
 from . import adaptor_zero_partition_parameters
 from . import adaptor_zero_stage_1_and_2
 from . import adaptor_zero_stage3
-from .adaptor_accelerator_npu_accelerator import set_npu_sccelerator
+from .adaptor_accelerator_npu_accelerator import set_npu_accelerator
 
-set_npu_sccelerator()
+set_npu_accelerator()

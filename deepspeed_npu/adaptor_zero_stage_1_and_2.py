@@ -32,7 +32,7 @@ stage_1_and_2.split_half_float_double = split_half_float_double
 
 
 def update_overflow_tracker_for_param_grad(self, param):
-    if param.grad is not None and torch._amp_foreach_non_finite_check_([param.grad.data]):
+    if param.grad is not None and torch_npu._amp_foreach_non_finite_check_([param.grad.data]):
         self.local_overflow = True
 
 
@@ -73,7 +73,7 @@ def complete_grad_norm_calculation_for_cpu_offload(self, params):
 
     total_norm = total_norm_npu[0].item() ** (1. / norm_type)
 
-    overflow = torch._amp_foreach_non_finite_check_([total_norm_npu])
+    overflow = torch_npu._amp_foreach_non_finite_check_([total_norm_npu])
     overflow_npu = get_accelerator().IntTensor([overflow])
     dist.all_reduce(overflow_npu, op=dist.ReduceOp.MAX, group=self.dp_process_group)
 
@@ -131,7 +131,7 @@ def get_grad_norm_direct(self, gradients, params, norm_type=2):
 
         total_norm = total_norm_npu[0].item() ** (1. / norm_type)
 
-    overflow = torch._amp_foreach_non_finite_check_([total_norm_npu])
+    overflow = torch_npu._amp_foreach_non_finite_check_([total_norm_npu])
     overflow_npu = get_accelerator().IntTensor([overflow])
     dist.all_reduce(overflow_npu, op=dist.ReduceOp.MAX, group=self.dp_process_group)
 
@@ -146,7 +146,7 @@ def get_grad_norm_direct(self, gradients, params, norm_type=2):
 
 def has_overflow_serial(self, params, is_grad_list=False):
     grads = [p.grad.data for p in params if p.grad is not None]
-    return torch._amp_foreach_non_finite_check_(grads)
+    return torch_npu._amp_foreach_non_finite_check_(grads)
 
 
 def has_overflow_partitioned_grads_serial(self):
@@ -155,7 +155,7 @@ def has_overflow_partitioned_grads_serial(self):
         for j, grad in enumerate(self.averaged_gradients[i]):
             if grad is not None:
                 grads.append(grad.data)
-    return torch._amp_foreach_non_finite_check_(grads)
+    return torch_npu._amp_foreach_non_finite_check_(grads)
 
 
 def has_overflow(self, partition_gradients=True):

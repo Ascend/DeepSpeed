@@ -84,7 +84,7 @@ def partition_grads(self, params_to_release: List[Parameter], grad_partitions: L
         #     self.inf_or_nan_tracker += torch.isinf(grad_buffer).any()
         #     self.inf_or_nan_tracker += torch.isnan(grad_buffer).any()
         #     self.inf_or_nan_tracker = self.inf_or_nan_tracker > 0
-        self.inf_or_nan_tracker[0] = self.inf_or_nan_tracker[0] or torch.npu.get_npu_overflow_flag()
+        self.inf_or_nan_tracker[0] = self.inf_or_nan_tracker[0] or torch_npu.npu.get_npu_overflow_flag()
 
         # offload the gradient partition if applicable
         if self.offload_optimizer:

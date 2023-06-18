@@ -252,5 +252,5 @@ class NPU_Accelerator(DeepSpeedAccelerator):
         return BuildExtension
 
 
-def set_npu_sccelerator():
+def set_npu_accelerator():
     deepspeed.accelerator.real_accelerator.set_accelerator(NPU_Accelerator())
