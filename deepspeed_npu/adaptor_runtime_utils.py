@@ -1,5 +1,6 @@
 import sys
 import torch
+import torch_npu
 import torch.distributed as dist
 try:
     from torch._six import inf
@@ -39,7 +40,7 @@ def check_using_norm(self, norm_group, reduce_overflow=True):
 
 def has_overflow_serial(self, params):
     grads = [p.grad.data for p in params if p.grad is not None]
-    res = torch._amp_foreach_non_finite_check_(grads)
+    res = torch_npu._amp_foreach_non_finite_check_(grads)
     return res
 
 def has_overflow(self, params, has_moe_params=None):
@@ -142,7 +143,7 @@ def get_grad_norm(parameters, norm_type=2, mpu=None):
                                          group=mpu.get_model_parallel_group())
         total_norm = total_norm_npu[0].item()**(1. / norm_type)
 
-    overflow = torch._amp_foreach_non_finite_check_([total_norm_npu])
+    overflow = torch_npu._amp_foreach_non_finite_check_([total_norm_npu])
     if mpu is not None:
         overflow_npu = torch.npu.IntTensor([overflow])
         torch.distributed.all_reduce(overflow_npu,
@@ -210,7 +211,7 @@ def get_weight_norm(parameters, norm_type=2, mpu=None):
                                          group=mpu.get_model_parallel_group())
         total_norm = total_norm_npu[0].item()**(1. / norm_type)
 
-    overflow = torch._amp_foreach_non_finite_check_([total_norm_npu])
+    overflow = torch_npu._amp_foreach_non_finite_check_([total_norm_npu])
     if mpu is not None:
         overflow_npu = torch.npu.IntTensor([overflow])
         torch.distributed.all_reduce(overflow_npu,

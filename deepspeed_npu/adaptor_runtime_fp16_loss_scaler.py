@@ -1,4 +1,5 @@
 import torch
+import torch_npu
 from torch_npu.npu import clear_npu_overflow_flag
 from deepspeed.runtime.fp16 import loss_scaler, unfused_optimizer
 
@@ -10,7 +11,7 @@ def backward(self, loss, retain_graph=False):
 
 def has_overflow_serial(self, params):
     grads = [p.grad.data for p in params if p.grad is not None]
-    return torch._amp_foreach_non_finite_check_(grads)
+    return torch_npu._amp_foreach_non_finite_check_(grads)
 
 loss_scaler.LossScalerBase.backward = backward
 loss_scaler.DynamicLossScaler.has_overflow_serial = has_overflow_serial

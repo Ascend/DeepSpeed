@@ -214,7 +214,7 @@ class DeepSpeedZeroOptimizerNpu(stage_1_and_2.DeepSpeedZeroOptimizer):
 
         total_norm = total_norm_npu[0].item()**(1. / norm_type)
 
-        overflow = torch._amp_foreach_non_finite_check_([total_norm_npu])
+        overflow = torch_npu._amp_foreach_non_finite_check_([total_norm_npu])
         overflow_npu = torch.npu.IntTensor([overflow])
         torch.distributed.all_reduce(overflow_npu,
                                      op=torch.distributed.ReduceOp.MAX,
@@ -283,7 +283,7 @@ class DeepSpeedZeroOptimizerNpu(stage_1_and_2.DeepSpeedZeroOptimizer):
                         self.copy_grads_in_partition(param)
 
             if self.cpu_offload:
-                self.local_overflow = torch._amp_foreach_non_finite_check_(self.grads_need_check_overflow)
+                self.local_overflow = torch_npu._amp_foreach_non_finite_check_(self.grads_need_check_overflow)
                 self.grads_need_check_overflow = []
 
         self.grads_in_ipg_bucket = []
@@ -341,7 +341,7 @@ class DeepSpeedZeroOptimizerNpu(stage_1_and_2.DeepSpeedZeroOptimizer):
 
             total_norm = total_norm_npu[0].item()**(1. / norm_type)
 
-        overflow = torch._amp_foreach_non_finite_check_([total_norm_npu])
+        overflow = torch_npu._amp_foreach_non_finite_check_([total_norm_npu])
         overflow_npu = torch.npu.IntTensor([overflow])
         torch.distributed.all_reduce(overflow_npu,
                                      op=torch.distributed.ReduceOp.MAX,
@@ -364,7 +364,7 @@ class DeepSpeedZeroOptimizerNpu(stage_1_and_2.DeepSpeedZeroOptimizer):
     # `params` is a list / generator of torch.Variable
     def has_overflow_serial(self, params, is_grad_list=False):
         grads = [p.grad.data for p in params if p.grad is not None]
-        return torch._amp_foreach_non_finite_check_(grads)
+        return torch_npu._amp_foreach_non_finite_check_(grads)
 
     def has_overflow_partitioned_grads_serial(self):
         grads = []
@@ -372,7 +372,7 @@ class DeepSpeedZeroOptimizerNpu(stage_1_and_2.DeepSpeedZeroOptimizer):
             for j, grad in enumerate(self.averaged_gradients[i]):
                 if grad is not None:
                     grads.append(grad.data)
-        return torch._amp_foreach_non_finite_check_(grads)
+        return torch_npu._amp_foreach_non_finite_check_(grads)
 
     def has_overflow(self, partition_gradients=True):
         if partition_gradients:

@@ -1,6 +1,7 @@
 from typing import Deque, Dict, Iterable, Set, Tuple, List
 import sys
 import torch
+import torch_npu
 from torch import Tensor
 try:
     from torch._six import inf
@@ -34,7 +35,7 @@ class DeepSpeedZeroOptimizer_Stage3Npu(DeepSpeedZeroOptimizer_Stage3):
 
         total_norm = total_norm_npu[0].item()**(1. / norm_type)
 
-        overflow = torch._amp_foreach_non_finite_check_([total_norm_npu])
+        overflow = torch_npu._amp_foreach_non_finite_check_([total_norm_npu])
         overflow_npu = torch.npu.IntTensor([overflow])
         torch.distributed.all_reduce(overflow_npu,
                                      op=torch.distributed.ReduceOp.MAX,
@@ -124,7 +125,7 @@ class DeepSpeedZeroOptimizer_Stage3Npu(DeepSpeedZeroOptimizer_Stage3):
             param.grad.record_stream(torch.npu.current_stream())
             param.grad = None
 
-        overflow_npu = torch._amp_foreach_non_finite_check_(grad_buffer_lst)
+        overflow_npu = torch_npu._amp_foreach_non_finite_check_(grad_buffer_lst)
         self._DeepSpeedZeroOptimizer_Stage3__inf_or_nan_tracker = torch.BoolTensor([overflow_npu]).to(torch.npu.current_device())
 
         if self.offload_optimizer and self.swap_optimizer:
@@ -182,7 +183,7 @@ class DeepSpeedZeroOptimizer_Stage3Npu(DeepSpeedZeroOptimizer_Stage3):
 
             total_norm = total_norm_npu.item()**(1. / norm_type)
         
-        overflow = torch._amp_foreach_non_finite_check_([total_norm_npu])
+        overflow = torch_npu._amp_foreach_non_finite_check_([total_norm_npu])
         overflow_npu = torch.npu.IntTensor([overflow])
         torch.distributed.all_reduce(overflow_npu,
                                      op=torch.distributed.ReduceOp.MAX,
@@ -199,7 +200,7 @@ class DeepSpeedZeroOptimizer_Stage3Npu(DeepSpeedZeroOptimizer_Stage3):
 
     def has_overflow_serial(self, params, is_grad_list=False):
         grads = [p.grad.data for p in params if p.grad is not None]
-        return torch._amp_foreach_non_finite_check_(grads)
+        return torch_npu._amp_foreach_non_finite_check_(grads)
 
     def has_overflow_partitioned_grads_serial(self):
         grads = []
@@ -207,7 +208,7 @@ class DeepSpeedZeroOptimizer_Stage3Npu(DeepSpeedZeroOptimizer_Stage3):
             for j, grad in enumerate(self.averaged_gradients[i]):
                 if grad is not None:
                     grads.append(grad.data)
-        return torch._amp_foreach_non_finite_check_(grads)
+        return torch_npu._amp_foreach_non_finite_check_(grads)
 
     def has_overflow(self, partition_gradients=True):
         if partition_gradients:
