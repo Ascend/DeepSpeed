@@ -36,13 +36,12 @@ def _configure_basic_optimizer(self, model_parameters):
                 optimizer = DeepSpeedCPUAdam(model_parameters, **optimizer_parameters, adamw_mode=effective_adam_w_mode)
             else:
                 # ASCEND VOID OPT
-                # from deepspeed.ops.adam import FusedAdam
-                # optimizer = FusedAdam(
-                #     model_parameters,
-                #     **optimizer_parameters,
-                #     adam_w_mode=effective_adam_w_mode,
-                # )
-                optimizer = torch.optim.AdamW(model_parameters, **optimizer_parameters)
+                from deepspeed.ops.adam import FusedAdam
+                optimizer = FusedAdam(
+                    model_parameters,
+                    **optimizer_parameters,
+                    adam_w_mode=effective_adam_w_mode,
+                )
     elif self.optimizer_name() == ADAGRAD_OPTIMIZER:
         if self.zero_use_cpu_optimizer():
             # ASCEND VOID OPT

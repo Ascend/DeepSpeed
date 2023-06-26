@@ -2,184 +2,127 @@ import math
 import torch
 import torch_npu
 import deepspeed
-from collections import defaultdict
-from apex.contrib.combine_tensors import combine_npu
+from deepspeed.accelerator import get_accelerator
+from deepspeed.ops.adam import FusedAdam
+from deepspeed.ops.op_builder import UtilsBuilder
+
+util_ops = UtilsBuilder().load()
+flatten = util_ops.flatten
 
 
-class FusedAdamNPU(torch.optim.Optimizer):
-    def __init__(self,
-                 params,
-                 lr=1e-3,
-                 bias_correction=True,
-                 betas=(0.9,
-                        0.999),
-                 eps=1e-8,
-                 adam_w_mode=True,
-                 weight_decay=0.01,
-                 amsgrad=False,
-                 set_grad_none=True):
+def FusedAdamInit(self, params, lr=1e-3, bias_correction=True, betas=(0.9, 0.999), eps=1e-8, adam_w_mode=True,
+                  weight_decay=0., amsgrad=False, set_grad_none=True):
+    if amsgrad:
+        raise RuntimeError('FusedAdam does not support the AMSGrad variant.')
+    defaults = dict(lr=lr, bias_correction=bias_correction, betas=betas, eps=eps, weight_decay=weight_decay)
+    super(FusedAdam, self).__init__(params, defaults)
+    self.adam_w_mode = 1 if adam_w_mode else 0
+    self.set_grad_none = set_grad_none
+    self.amsgrad = amsgrad  # its possible with npu_apply_adam_w operator
 
-        if amsgrad:
-            raise RuntimeError('FusedAdam does not support the AMSGrad variant.')
-        defaults = dict(lr=lr,
-                        bias_correction=bias_correction,
-                        betas=betas,
-                        eps=eps,
-                        weight_decay=weight_decay)
-        super(FusedAdamNPU, self).__init__(params, defaults)
-        self.adam_w_mode = 1 if adam_w_mode else 0
+    # Skip buffer
+    self._dummy_overflow_buf = get_accelerator().IntTensor([0])
 
-        self.combined_states = []
-        # Skip buffer
-        self._dummy_overflow_buf = torch.npu.IntTensor([0])
 
-    def _init_combined_states(self):
-        for group in self.param_groups:
-            amsgrad = group['amsgrad'] if 'amsgrad' in group else False
+def unflatten(flatted_tensor, tensor_list):
+    for buf, flatted in zip(tensor_list, util_ops.unflatten(flatted_tensor, tensor_list)):
+        buf.copy_(flatted)
+    return tensor_list
 
-            params_list = []
-            grads_list = []
-            step_list = []
-            exp_avg_list = []
-            exp_avg_sq_list = []
-            max_exp_avg_sq_list = []
 
-            # get params states list
-            for param in group['params']:
-                if param.grad is None:
-                    param.grad = torch.zeros_like(param, memory_format=torch.preserve_format)
-                if param.grad.is_sparse:
-                    raise RuntimeError('NpuFusedAdamW does not support sparse gradients, '
-                                       'please consider SparseAdam instead')
+def step(self, closure=None, grads=None, output_params=None, scale=None, grad_norms=None):
+    if any(p is not None for p in [grads, output_params, scale, grad_norms]):
+        raise RuntimeError(
+            'FusedAdam has been updated.  Simply initialize it identically to torch.optim.Adam, and call step() with no arguments.'
+        )
+    loss = None
+    if closure is not None:
+        loss = closure()
 
-                params_list.append(param.data)
-                grads_list.append(param.grad.data)
-
-                self._init_param_state(param, amsgrad)
-
-                step_list.append(self.state[param]['step'])
-                exp_avg_list.append(self.state[param]['exp_avg'])
-                exp_avg_sq_list.append(self.state[param]['exp_avg_sq'])
-                if amsgrad:
-                    max_exp_avg_sq_list.append(self.state[param]['max_exp_avg_sq'])
-
-            combined_step = 0
-            combined_params = None
-            combined_grads = None
-            combined_exp_avg = None
-            combined_exp_avg_sq = None
-            combined_max_exp_avg_sq = None
-
-            if len(exp_avg_list) > 0:
-                combined_step = step_list[0]
-                combined_params = combine_npu(params_list)
-                combined_grads = combine_npu(grads_list)
-                combined_exp_avg = combine_npu(exp_avg_list)
-                combined_exp_avg_sq = combine_npu(exp_avg_sq_list)
-                combined_max_exp_avg_sq = combine_npu(max_exp_avg_sq_list)
-
-            combined_state = defaultdict(dict)
-            combined_state['params'] = combined_params
-            combined_state['grads'] = combined_grads
-            combined_state['step'] = combined_step
-            combined_state['exp_avg'] = combined_exp_avg
-            combined_state['exp_avg_sq'] = combined_exp_avg_sq
-            combined_state['max_exp_avg_sq'] = combined_max_exp_avg_sq
-            self.combined_states.append(combined_state)
-
-    def _init_param_state(self, p, amsgrad):
-        state = self.state[p]
-        # State initialization
-        if len(state) == 0:
-            state['step'] = 0
-            # Exponential moving average of gradient values
-            state['exp_avg'] = torch.zeros_like(p, memory_format=torch.preserve_format)
-            # Exponential moving average of squared gradient values
-            state['exp_avg_sq'] = torch.zeros_like(p, memory_format=torch.preserve_format)
-            if amsgrad:
-                # Maintains max of all exp. moving avg. of sq. grad. values
-                state['max_exp_avg_sq'] = torch.zeros_like(p, memory_format=torch.preserve_format)
-        else:
-            exp_avg_tmp = torch.zeros_like(p, memory_format=torch.preserve_format)
-            exp_avg_tmp.copy_(state['exp_avg'])
-            state['exp_avg'] = exp_avg_tmp
-
-            exp_avg_sq_tmp = torch.zeros_like(p, memory_format=torch.preserve_format)
-            exp_avg_sq_tmp.copy_(state['exp_avg_sq'])
-            state['exp_avg_sq'] = exp_avg_sq_tmp
-
-            if amsgrad:
-                max_exp_avg_sq_tmp = torch.zeros_like(p, memory_format=torch.preserve_format)
-                max_exp_avg_sq_tmp.copy_(state['max_exp_avg_sq'])
-                state['max_exp_avg_sq'] = max_exp_avg_sq_tmp
-
-    def zero_grad(self, set_to_none: bool = False):
-        for combined_state in self.combined_states:
-            combined_state['grads'].zero_()
-
-    def _group_step(self, group_index, group):
-        amsgrad = group['amsgrad'] if 'amsgrad' in group else False
+    for group in self.param_groups:
+        bias_correction = 1 if group['bias_correction'] else 0
         beta1, beta2 = group['betas']
 
-        combined_params = self.combined_states[group_index]['params']
-        combined_grads = self.combined_states[group_index]['grads']
+        if 'step' not in group:
+            group['step'] = 0
 
-        if combined_params is None or combined_grads is None:
-            return
+        # create lists for multi-tensor apply
+        g_16, p_16, m_16, v_16 = [], [], [], []
+        g_32, p_32, m_32, v_32 = [], [], [], []
 
-        exp_avg = self.combined_states[group_index]['exp_avg']
-        exp_avg_sq = self.combined_states[group_index]['exp_avg_sq']
-        if amsgrad:
-            max_exp_avg_sq = self.combined_states[group_index]['max_exp_avg_sq']
+        for p in group['params']:
+            if p.grad is None:
+                continue
+            if p.grad.data.is_sparse:
+                raise RuntimeError(
+                    'FusedAdam does not support sparse gradients, please consider SparseAdam instead')
 
-        self.combined_states[group_index]['step'] += 1
+            state = self.state[p]
+            # State initialization
+            if len(state) == 0:
+                # DeepSpeed ZeRO 3 processes each subgroup a time, so we need to keep tracking step count for each tensor separately.
+                # While this is not an issue for ZeRO 1 & 2, since they apply a single optimizatin step to the whole param group at the same time.
+                # In order to keep backward compatibility for the existing checkpoints, we use group['state'] to initialize state['step'] if it exists.
+                state['step'] = group.get('step', 0)
+                # Exponential moving average of gradient values
+                state['exp_avg'] = torch.zeros_like(p.data)
+                # Exponential moving average of squared gradient values
+                state['exp_avg_sq'] = torch.zeros_like(p.data)
 
-        # Perform stepweight decay. The fused method is used here to speed up the calculation
-        if self.adam_w_mode:
-            combined_params.mul_(1 - group['lr'] * group['weight_decay'])
+            if p.dtype == torch.float16:
+                g_16.append(p.grad.data)
+                p_16.append(p.data)
+                m_16.append(state['exp_avg'])
+                v_16.append(state['exp_avg_sq'])
+            elif p.dtype == torch.float32:
+                g_32.append(p.grad.data)
+                p_32.append(p.data)
+                m_32.append(state['exp_avg'])
+                v_32.append(state['exp_avg_sq'])
+            else:
+                raise RuntimeError('FusedAdam only support fp16 and fp32.')
 
-        bias_correction1 = 1 - beta1 ** self.combined_states[group_index]['step']
-        bias_correction2 = 1 - beta2 ** self.combined_states[group_index]['step']
-
-        if not self.adam_w_mode and group['weight_decay'] != 0:
-            combined_grads = combined_grads.add(combined_params, alpha=group['weight_decay'])
-
-        # Decay the first and second moment running average coefficient
-        exp_avg.mul_(beta1).add_(combined_grads, alpha=1 - beta1)
-        exp_avg_sq.mul_(beta2).addcmul_(combined_grads, combined_grads, value=1 - beta2)
-        if amsgrad:
-            # Maintains the maximum of all 2nd moment running avg. till now
-            torch.max(max_exp_avg_sq, exp_avg_sq, out=max_exp_avg_sq)
-            # Use the max. for normalizing running avg. of gradient
-            denom = (max_exp_avg_sq.sqrt() / math.sqrt(bias_correction2)).add_(group['eps'])
+        if len(g_16) > 0:
+            grad_flat = flatten(g_16)
+            param_flat = flatten(p_16)
+            m_flat = flatten(m_16)
+            v_flat = flatten(v_16)
         else:
-            denom = (exp_avg_sq.sqrt() / math.sqrt(bias_correction2)).add_(group['eps'])
+            grad_flat = flatten(g_32)
+            param_flat = flatten(p_32)
+            m_flat = flatten(m_32)
+            v_flat = flatten(v_32)
 
-        step_size = group['lr'] / bias_correction1
+        state['step'] += 1
+        bias_correction1 = beta1 ** state['step']
+        bias_correction2 = beta2 ** state['step']
 
-        combined_params.addcdiv_(exp_avg, denom, value=-step_size)
+        param_flat.data, m_flat, v_flat = torch_npu.npu_apply_adam_w(
+            bias_correction1,
+            bias_correction2,
+            group['lr'],
+            group['weight_decay'],
+            beta1,
+            beta2,
+            group['eps'],
+            grad_flat,
+            None,
+            self.amsgrad,
+            False,
+            out=(param_flat.data, m_flat, v_flat)
+        )
 
-    def step(self,
-             closure=None,
-             grads=None,
-             output_params=None,
-             scale=None,
-             grad_norms=None):
-        if any(p is not None for p in [grads, output_params, scale, grad_norms]):
-            raise RuntimeError(
-                'FusedAdam has been updated.  Simply initialize it identically to torch.optim.Adam, and call step() with no arguments.'
-            )
-        loss = None
-        if closure is not None:
-            loss = closure()
+        if len(g_16) > 0:
+            unflatten(param_flat, p_16)
+            unflatten(m_flat, m_16)
+            unflatten(v_flat, v_16)
+        else:
+            unflatten(param_flat, p_32)
+            unflatten(m_flat, m_32)
+            unflatten(v_flat, v_32)
 
-        if len(self.combined_states) == 0:
-            self._init_combined_states()
-
-        for i, group in enumerate(self.param_groups):
-            self._group_step(i, group)
-
-        return loss
+    return loss
 
 
-deepspeed.ops.adam.fused_adam.FusedAdam = FusedAdamNPU
+deepspeed.ops.adam.FusedAdam.__init__ = FusedAdamInit
+deepspeed.ops.adam.FusedAdam.step = step
