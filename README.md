@@ -14,6 +14,7 @@
 10. Fused Adam
 11. One-bit Adam
 12. MoE
+13. Zero Infinity
 
 请参考 deepspeed 官方文档获取这些特性的详细说明：https://www.deepspeed.ai/
 

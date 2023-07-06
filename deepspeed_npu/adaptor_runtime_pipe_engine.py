@@ -20,6 +20,8 @@ ID_TO_DTYPE = [
     torch.bool
 ]
 
+DTYPE_TO_ID = {dtype: id_ for id_, dtype in enumerate(ID_TO_DTYPE)}
+
 
 def _exec_backward_pass(self, buffer_id):
     clear_npu_overflow_flag()
@@ -395,6 +397,7 @@ def _exec_send_grads(self, buffer_id):
 
 
 engine.PipelineEngine.ID_TO_DTYPE = ID_TO_DTYPE
+engine.PipelineEngine.DTYPE_TO_ID = DTYPE_TO_ID
 engine.PipelineEngine._INSTRUCTION_MAP[schedule.BackwardPass] = _exec_backward_pass
 engine.PipelineEngine._INSTRUCTION_MAP[schedule.RecvActivation] = _exec_recv_activations
 engine.PipelineEngine._INSTRUCTION_MAP[schedule.RecvGrad] = _exec_recv_grads
