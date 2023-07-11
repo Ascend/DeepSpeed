@@ -18,25 +18,22 @@
 
 请参考 deepspeed 官方文档获取这些特性的详细说明：https://www.deepspeed.ai/
 
-### 1.版本说明
 
-目前仅支持 deepspeed 版本 0.9.2：https://github.com/microsoft/DeepSpeed/tree/v0.9.2
+1. 然后安装 deepspeed-npu 插件
 
-### 2.安装方法
-
-1. 先安装原生 deepspeed
-
-```
-pip3 install deepspeed==0.9.2
-```
-
-2. 然后安装 deepspeed-npu 插件
-
-```
+```bash
 git clone https://gitee.com/ascend/DeepSpeed.git
 cd DeepSpeed
-pip3 install ./
+pip3 install .
 ```
+
+or equivalently
+
+```bash
+pip3 install git+https://gitee.com/ascend/DeepSpeed@v0.9.2
+```
+
+You must install `PyTorch` and `torch_npu` manually.
 
 ***注：*** deepspeed-npu 安装后会修改命令行 deepspeed 和 ds，请按照顺序安装，并使用匹配的版本。
 如因权限问题自动替换没有生效，请手动替换。
@@ -55,7 +52,7 @@ if __name__ == '__main__':
 
 在入口文件行首 import deepspeed_npu，并配合 deepspeed / torch 使用,例如
 
-```
+```python
 import deepspeed_npu
 import torch
 import torch_npu
@@ -68,31 +65,31 @@ import torch_npu
 
 fp16:
 
-```
+```bash
 bash test_fp16.sh
 ```
 
 Pipeline:
 
-```
+```bash
 bash test_pipeline.sh
 ```
 
 ZeRO:
 
-```
+```bash
 bash test_zero.sh
 ```
 
 one-bit Adam:
 
-```
+```bash
 bash test_onebit_adam.sh
 ```
 
 MoE:
 
-```
+```bash
 bash test_moe.sh
 ```
 
