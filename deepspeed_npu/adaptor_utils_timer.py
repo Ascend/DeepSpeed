@@ -33,7 +33,7 @@ def stop(self, reset=False, record=False):
 
 
 def _get_elapsed_msec(self):
-    return self.elapsed_
+    return self.elapsed_ * 1000
 
 
 def reset(self):
