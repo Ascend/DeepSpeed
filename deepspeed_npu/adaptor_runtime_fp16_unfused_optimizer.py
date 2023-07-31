@@ -5,6 +5,7 @@ from torch_npu.npu import clear_npu_overflow_flag
 from deepspeed.utils import logger
 from deepspeed.runtime.utils import get_global_norm, CheckOverflow, get_weight_norm
 from deepspeed.moe.utils import split_params_grads_into_shared_and_expert_params
+from . import FLAG_SUPPORT_INF_NAN
 
 
 def step(self, closure=None):
@@ -54,7 +55,8 @@ def step(self, closure=None):
 
 
 def backward(self, loss, create_graph=False, retain_graph=False):
-    clear_npu_overflow_flag()
+    if not FLAG_SUPPORT_INF_NAN:
+        clear_npu_overflow_flag()
     if self.custom_loss_scaler:
         scaled_loss = self.external_loss_scale * loss
         scaled_loss.backward()

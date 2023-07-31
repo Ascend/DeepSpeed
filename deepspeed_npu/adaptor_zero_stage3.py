@@ -8,6 +8,7 @@ from deepspeed import comm as dist
 from deepspeed.accelerator import get_accelerator
 from deepspeed.runtime.utils import is_model_parallel_parameter
 from deepspeed.runtime.utils import see_memory_usage
+from . import FLAG_SUPPORT_INF_NAN
 
 try:
     from torch._six import inf
@@ -33,12 +34,15 @@ def complete_grad_norm_calculation_for_cpu_offload(self, params):
 
     total_norm = total_norm_npu[0].item()**(1. / norm_type)
 
-    overflow = torch_npu._amp_foreach_non_finite_check_([total_norm_npu])
-    overflow_npu = torch.npu.IntTensor([overflow])
-    dist.all_reduce(overflow_npu, op=dist.ReduceOp.MAX, group=self.dp_process_group)
-    self._model_parallel_all_reduce(tensor=overflow_npu, op=dist.ReduceOp.MAX)
+    overflow_npu = False
+    if not FLAG_SUPPORT_INF_NAN:
+        overflow = torch_npu._amp_foreach_non_finite_check_([total_norm_npu])
+        overflow_npu = torch.npu.IntTensor([overflow])
+        dist.all_reduce(overflow_npu, op=dist.ReduceOp.MAX, group=self.dp_process_group)
+        self._model_parallel_all_reduce(tensor=overflow_npu, op=dist.ReduceOp.MAX)
+        overflow_npu = overflow_npu.item()
 
-    if overflow_npu.item() or total_norm == float('inf') or total_norm == -float('inf') or total_norm != total_norm:
+    if overflow_npu or total_norm == float('inf') or total_norm == -float('inf') or total_norm != total_norm:
         total_norm = -1
 
     return total_norm
@@ -76,15 +80,17 @@ def partition_grads(self, params_to_release: List[Parameter], grad_partitions: L
             # operations and so it can be used asynchronously
             grad_buffer = cuda_grad_buffer
 
-        # if hasattr(self.inf_or_nan_tracker, "logical_or_"):
-        #     self.inf_or_nan_tracker.logical_or_(torch.isinf(grad_buffer).any())
-        #     self.inf_or_nan_tracker.logical_or_(torch.isnan(grad_buffer).any())
-        # else:
-        #     # logical_or_ not available in older versions of pytorch
-        #     self.inf_or_nan_tracker += torch.isinf(grad_buffer).any()
-        #     self.inf_or_nan_tracker += torch.isnan(grad_buffer).any()
-        #     self.inf_or_nan_tracker = self.inf_or_nan_tracker > 0
-        self.inf_or_nan_tracker[0] = self.inf_or_nan_tracker[0] or torch_npu.npu.get_npu_overflow_flag()
+        if not FLAG_SUPPORT_INF_NAN:
+            self.inf_or_nan_tracker[0] = self.inf_or_nan_tracker[0] or torch_npu.npu.get_npu_overflow_flag()
+        else:
+            if hasattr(self.inf_or_nan_tracker, "logical_or_"):
+                self.inf_or_nan_tracker.logical_or_(torch.isinf(grad_buffer).any())
+                self.inf_or_nan_tracker.logical_or_(torch.isnan(grad_buffer).any())
+            else:
+                # logical_or_ not available in older versions of pytorch
+                self.inf_or_nan_tracker += torch.isinf(grad_buffer).any()
+                self.inf_or_nan_tracker += torch.isnan(grad_buffer).any()
+                self.inf_or_nan_tracker = self.inf_or_nan_tracker > 0
 
         # offload the gradient partition if applicable
         if self.offload_optimizer:
@@ -151,17 +157,31 @@ def get_grad_norm_direct(self, gradients, params, norm_type=2):
 
 
 def has_overflow_serial(self, params, is_grad_list=False):
-    grads = [p.grad.data for p in params if p.grad is not None]
-    return torch_npu._amp_foreach_non_finite_check_(grads)
+    if not FLAG_SUPPORT_INF_NAN:
+        grads = [p.grad.data for p in params if p.grad is not None]
+        return torch_npu._amp_foreach_non_finite_check_(grads)
+
+    for p in params:
+        if p.grad is not None and self._has_inf_or_nan(p.grad.data):
+            return True
+
+    return False
 
 
 def has_overflow_partitioned_grads_serial(self):
-    grads = []
+    if not FLAG_SUPPORT_INF_NAN:
+        grads = []
+        for i in range(len(self.fp16_groups)):
+            for j, grad in enumerate(self.averaged_gradients[i]):
+                if grad is not None:
+                    grads.append(grad.data)
+        return torch_npu._amp_foreach_non_finite_check_(grads)
+
     for i in range(len(self.fp16_groups)):
         for j, grad in enumerate(self.averaged_gradients[i]):
-            if grad is not None:
-                grads.append(grad.data)
-    return torch_npu._amp_foreach_non_finite_check_(grads)
+            if grad is not None and self._has_inf_or_nan(grad.data, j):
+                return True
+    return False
 
 
 def has_overflow(self, partition_gradients=True):
@@ -186,7 +206,8 @@ def has_overflow(self, partition_gradients=True):
 
     # Since each model parallel GPU carries only part of the model,
     # make sure overflow flag is synced across all the model parallel GPUs
-    dist.all_reduce(overflow_npu, op=dist.ReduceOp.MAX, group=self.dp_process_group)
+    if not FLAG_SUPPORT_INF_NAN:
+        dist.all_reduce(overflow_npu, op=dist.ReduceOp.MAX, group=self.dp_process_group)
     self._model_parallel_all_reduce(tensor=overflow_npu, op=dist.ReduceOp.MAX)
 
     overflow = overflow_npu[0].item()
@@ -194,7 +215,8 @@ def has_overflow(self, partition_gradients=True):
 
 
 def backward(self, loss, retain_graph=False):
-    torch_npu.npu.clear_npu_overflow_flag()
+    if not FLAG_SUPPORT_INF_NAN:
+        torch_npu.npu.clear_npu_overflow_flag()
     if self.swap_optimizer:
         self.optimizer_swapper.pre_backward()
 

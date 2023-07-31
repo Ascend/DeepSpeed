@@ -5,6 +5,7 @@ from torch_npu.npu import clear_npu_overflow_flag
 from deepspeed.runtime.pipe.engine import _tensor_bytes
 from deepspeed.runtime.pipe import p2p, engine, schedule
 from deepspeed.runtime.utils import PartitionedTensor
+from . import FLAG_SUPPORT_INF_NAN
 
 ID_TO_DTYPE = [
     torch.float32,
@@ -24,7 +25,8 @@ DTYPE_TO_ID = {dtype: id_ for id_, dtype in enumerate(ID_TO_DTYPE)}
 
 
 def _exec_backward_pass(self, buffer_id):
-    clear_npu_overflow_flag()
+    if not FLAG_SUPPORT_INF_NAN:
+        clear_npu_overflow_flag()
 
     assert self.optimizer is not None, "must provide optimizer during " \
                                        "init in order to use backward"

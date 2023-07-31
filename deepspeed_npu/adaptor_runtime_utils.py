@@ -8,6 +8,7 @@ from deepspeed.accelerator import get_accelerator
 from deepspeed.utils import groups
 from deepspeed.runtime.constants import PIPE_REPLICATED
 from deepspeed.runtime.utils import bwc_tensor_model_parallel_rank, is_model_parallel_parameter
+from . import FLAG_SUPPORT_INF_NAN
 
 try:
     from torch._six import inf
@@ -37,8 +38,15 @@ def check_using_norm(self, norm_group, reduce_overflow=True):
 
 
 def has_overflow_serial(self, params):
-    grads = [p.grad.data for p in params if p.grad is not None]
-    return torch_npu._amp_foreach_non_finite_check_(grads)
+    if not FLAG_SUPPORT_INF_NAN:
+        grads = [p.grad.data for p in params if p.grad is not None]
+        return torch_npu._amp_foreach_non_finite_check_(grads)
+
+    for p in params:
+        if p.grad is not None and self._has_inf_or_nan(p.grad.data):
+            return True
+
+    return False
 
 
 def has_overflow(self, params, has_moe_params=None):
@@ -103,11 +111,13 @@ def get_grad_norm(parameters, norm_type=2, mpu=None):
             dist.all_reduce(total_norm_npu, op=dist.ReduceOp.SUM, group=mpu.get_model_parallel_group())
         total_norm = total_norm_npu[0].item()**(1. / norm_type)
 
-    overflow = torch_npu._amp_foreach_non_finite_check_([total_norm_npu])
-    if mpu is not None:
-        overflow_npu = torch.npu.IntTensor([overflow])
-        dist.all_reduce(overflow_npu, op=dist.ReduceOp.MAX, group=mpu.get_model_parallel_group())
-        overflow = overflow_npu.item()
+    overflow = False
+    if not FLAG_SUPPORT_INF_NAN:
+        overflow = torch_npu._amp_foreach_non_finite_check_([total_norm_npu])
+        if mpu is not None:
+            overflow_npu = torch.npu.IntTensor([overflow])
+            dist.all_reduce(overflow_npu, op=dist.ReduceOp.MAX, group=mpu.get_model_parallel_group())
+            overflow = overflow_npu.item()
 
     if overflow or total_norm == float('inf') or total_norm == -float('inf') or total_norm != total_norm:
         total_norm = -1
@@ -149,11 +159,13 @@ def get_weight_norm(parameters, norm_type=2, mpu=None):
             dist.all_reduce(total_norm_npu, op=dist.ReduceOp.SUM, group=mpu.get_model_parallel_group())
         total_norm = total_norm_npu[0].item()**(1. / norm_type)
 
-    overflow = torch_npu._amp_foreach_non_finite_check_([total_norm_npu])
-    if mpu is not None:
-        overflow_npu = torch.npu.IntTensor([overflow])
-        dist.all_reduce(overflow_npu, op=dist.ReduceOp.MAX, group=mpu.get_model_parallel_group())
-        overflow = overflow_npu.item()
+    overflow = False
+    if not FLAG_SUPPORT_INF_NAN:
+        overflow = torch_npu._amp_foreach_non_finite_check_([total_norm_npu])
+        if mpu is not None:
+            overflow_npu = torch.npu.IntTensor([overflow])
+            dist.all_reduce(overflow_npu, op=dist.ReduceOp.MAX, group=mpu.get_model_parallel_group())
+            overflow = overflow_npu.item()
 
     if overflow or total_norm == float('inf') or total_norm == -float('inf') or total_norm != total_norm:
         total_norm = -1

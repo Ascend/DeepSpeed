@@ -18,34 +18,24 @@
 
 请参考 deepspeed 官方文档获取这些特性的详细说明：https://www.deepspeed.ai/
 
+### 1.版本说明
 
-1. 然后安装 deepspeed-npu 插件
+目前仅支持 deepspeed 版本 0.9.2：https://github.com/microsoft/DeepSpeed/tree/v0.9.2
+
+### 2.安装方法
+
+1. 先安装原生 deepspeed
 
 ```bash
-git clone https://gitee.com/ascend/DeepSpeed.git
+pip3 install deepspeed==0.9.2
+```
+
+2. 然后安装 deepspeed-npu 插件
+
+```bash
+git clone https://gitee.com/ascend/DeepSpeed.git -b v0.9.2 deepspeed_npu
 cd DeepSpeed
 pip3 install .
-```
-
-or equivalently
-
-```bash
-pip3 install git+https://gitee.com/ascend/DeepSpeed@v0.9.2
-```
-
-You must install `PyTorch` and `torch_npu` manually.
-
-***注：*** deepspeed-npu 安装后会修改命令行 deepspeed 和 ds，请按照顺序安装，并使用匹配的版本。
-如因权限问题自动替换没有生效，请手动替换。
-
-使用 `which deepspeed` 获取 deepspeed 命令位置，并在首行导入 deepspeed_npu 包。
-
-```python
-import deepspeed_npu
-from deepspeed.launcher.runner import main
-
-if __name__ == '__main__':
-    main()
 ```
 
 ### 3.插件使用方法

@@ -12,6 +12,7 @@ from deepspeed.accelerator import get_accelerator
 from deepspeed.runtime.zero import stage_1_and_2
 from deepspeed.runtime.utils import is_model_parallel_parameter
 from deepspeed.runtime.constants import PIPE_REPLICATED
+from . import FLAG_SUPPORT_INF_NAN
 
 
 def split_half_float_double(tensors):
@@ -32,8 +33,12 @@ stage_1_and_2.split_half_float_double = split_half_float_double
 
 
 def update_overflow_tracker_for_param_grad(self, param):
-    if param.grad is not None and torch_npu._amp_foreach_non_finite_check_([param.grad.data]):
-        self.local_overflow = True
+    if not FLAG_SUPPORT_INF_NAN:
+        if param.grad is not None and torch_npu._amp_foreach_non_finite_check_([param.grad.data]):
+            self.local_overflow = True
+    else:
+        if param.grad is not None and self._has_inf_or_nan(param.grad.data):
+            self.local_overflow = True
 
 
 def complete_grad_norm_calculation_for_cpu_offload(self, params):
@@ -73,14 +78,15 @@ def complete_grad_norm_calculation_for_cpu_offload(self, params):
 
     total_norm = total_norm_npu[0].item() ** (1. / norm_type)
 
-    overflow = torch_npu._amp_foreach_non_finite_check_([total_norm_npu])
-    overflow_npu = get_accelerator().IntTensor([overflow])
-    dist.all_reduce(overflow_npu, op=dist.ReduceOp.MAX, group=self.dp_process_group)
+    overflow_npu = False
+    if not FLAG_SUPPORT_INF_NAN:
+        overflow = torch_npu._amp_foreach_non_finite_check_([total_norm_npu])
+        overflow_npu = get_accelerator().IntTensor([overflow])
+        dist.all_reduce(overflow_npu, op=dist.ReduceOp.MAX, group=self.dp_process_group)
+        self._model_parallel_all_reduce(tensor=overflow_npu, op=dist.ReduceOp.MAX)
+        overflow_npu = overflow_npu.item()
 
-    self._model_parallel_all_reduce(tensor=overflow_npu, op=dist.ReduceOp.MAX)
-
-    if overflow_npu.item() or total_norm == float('inf') or \
-            total_norm == -float('inf') or total_norm != total_norm:
+    if overflow_npu or total_norm == float('inf') or total_norm == -float('inf') or total_norm != total_norm:
         total_norm = -1
 
     return total_norm
@@ -131,31 +137,47 @@ def get_grad_norm_direct(self, gradients, params, norm_type=2):
 
         total_norm = total_norm_npu[0].item() ** (1. / norm_type)
 
-    overflow = torch_npu._amp_foreach_non_finite_check_([total_norm_npu])
-    overflow_npu = get_accelerator().IntTensor([overflow])
-    dist.all_reduce(overflow_npu, op=dist.ReduceOp.MAX, group=self.dp_process_group)
+    overflow_npu = False
+    if not FLAG_SUPPORT_INF_NAN:
+        overflow = torch_npu._amp_foreach_non_finite_check_([total_norm_npu])
+        overflow_npu = get_accelerator().IntTensor([overflow])
+        dist.all_reduce(overflow_npu, op=dist.ReduceOp.MAX, group=self.dp_process_group)
+        self._model_parallel_all_reduce(tensor=overflow_npu, op=dist.ReduceOp.MAX)
+        overflow_npu = overflow_npu.item()
 
-    self._model_parallel_all_reduce(tensor=overflow_npu, op=dist.ReduceOp.MAX)
-
-    if overflow_npu.item() or total_norm == float('inf') or \
-            total_norm == -float('inf') or total_norm != total_norm:
+    if overflow_npu or total_norm == float('inf') or total_norm == -float('inf') or total_norm != total_norm:
         total_norm = -1
 
     return total_norm
 
 
 def has_overflow_serial(self, params, is_grad_list=False):
-    grads = [p.grad.data for p in params if p.grad is not None]
-    return torch_npu._amp_foreach_non_finite_check_(grads)
+    if not FLAG_SUPPORT_INF_NAN:
+        grads = [p.grad.data for p in params if p.grad is not None]
+        return torch_npu._amp_foreach_non_finite_check_(grads)
+
+    for p in params:
+        if p.grad is not None and self._has_inf_or_nan(p.grad.data):
+            return True
+
+    return False
 
 
 def has_overflow_partitioned_grads_serial(self):
-    grads = []
+    if not FLAG_SUPPORT_INF_NAN:
+        grads = []
+        for i in range(len(self.bit16_groups)):
+            for j, grad in enumerate(self.averaged_gradients[i]):
+                if grad is not None:
+                    grads.append(grad.data)
+        return torch_npu._amp_foreach_non_finite_check_(grads)
+
+
     for i in range(len(self.bit16_groups)):
         for j, grad in enumerate(self.averaged_gradients[i]):
-            if grad is not None:
-                grads.append(grad.data)
-    return torch_npu._amp_foreach_non_finite_check_(grads)
+            if grad is not None and self._has_inf_or_nan(grad.data, j):
+                return True
+    return False
 
 
 def has_overflow(self, partition_gradients=True):
