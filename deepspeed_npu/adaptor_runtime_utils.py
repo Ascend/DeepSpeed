@@ -42,10 +42,9 @@ def has_overflow_serial(self, params):
         grads = [p.grad.data for p in params if p.grad is not None]
         return torch_npu._amp_foreach_non_finite_check_(grads)
 
-    for p in params:
-        if p.grad is not None and self._has_inf_or_nan(p.grad.data):
+    for i, p in enumerate(params):
+        if p.grad is not None and self._has_inf_or_nan(p.grad.data, i):
             return True
-
     return False
 
 
