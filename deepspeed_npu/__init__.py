@@ -18,7 +18,9 @@ from . import adaptor_runtime_activation_checkpointing_checkpointing
 from . import adaptor_runtime_comm_coalesced_collectives
 from . import adaptor_runtime_fp16_loss_scaler
 from . import adaptor_runtime_fp16_onebit_adam
+from . import adaptor_runtime_fp16_onebit_zoadam
 from . import adaptor_runtime_fp16_unfused_optimizer
+from . import adaptor_runtime_fp16_fused_optimizer
 from . import adaptor_runtime_engine
 from . import adaptor_runtime_utils
 from . import adaptor_zero_partition_parameters

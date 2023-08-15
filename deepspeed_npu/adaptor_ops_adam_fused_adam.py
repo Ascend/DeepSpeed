@@ -82,44 +82,48 @@ def step(self, closure=None, grads=None, output_params=None, scale=None, grad_no
             else:
                 raise RuntimeError('FusedAdam only support fp16 and fp32.')
 
+        has_param_to_flatten = True
         if len(g_16) > 0:
             grad_flat = flatten(g_16)
             param_flat = flatten(p_16)
             m_flat = flatten(m_16)
             v_flat = flatten(v_16)
-        else:
+        elif len(g_32) > 0:
             grad_flat = flatten(g_32)
             param_flat = flatten(p_32)
             m_flat = flatten(m_32)
             v_flat = flatten(v_32)
-
-        state['step'] += 1
-        bias_correction1 = beta1 ** state['step']
-        bias_correction2 = beta2 ** state['step']
-
-        param_flat.data, m_flat, v_flat = torch_npu.npu_apply_adam_w(
-            bias_correction1,
-            bias_correction2,
-            group['lr'],
-            group['weight_decay'],
-            beta1,
-            beta2,
-            group['eps'],
-            grad_flat,
-            None,
-            self.amsgrad,
-            False,
-            out=(param_flat.data, m_flat, v_flat)
-        )
-
-        if len(g_16) > 0:
-            unflatten(param_flat, p_16)
-            unflatten(m_flat, m_16)
-            unflatten(v_flat, v_16)
         else:
-            unflatten(param_flat, p_32)
-            unflatten(m_flat, m_32)
-            unflatten(v_flat, v_32)
+            has_param_to_flatten = False
+
+        if has_param_to_flatten:
+            state['step'] += 1
+            bias_correction1 = beta1 ** state['step']
+            bias_correction2 = beta2 ** state['step']
+
+            param_flat.data, m_flat, v_flat = torch_npu.npu_apply_adam_w(
+                bias_correction1,
+                bias_correction2,
+                group['lr'],
+                group['weight_decay'],
+                beta1,
+                beta2,
+                group['eps'],
+                grad_flat,
+                None,
+                self.amsgrad,
+                False,
+                out=(param_flat.data, m_flat, v_flat)
+            )
+
+            if len(g_16) > 0:
+                unflatten(param_flat, p_16)
+                unflatten(m_flat, m_16)
+                unflatten(v_flat, v_16)
+            if len(g_32) > 0:
+                unflatten(param_flat, p_32)
+                unflatten(m_flat, m_32)
+                unflatten(v_flat, v_32)
 
     return loss
 
