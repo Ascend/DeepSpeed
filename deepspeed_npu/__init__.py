@@ -26,6 +26,7 @@ from . import adaptor_runtime_utils
 from . import adaptor_zero_partition_parameters
 from . import adaptor_zero_stage_1_and_2
 from . import adaptor_zero_stage3
+from . import adaptor_zero_mics
 from . import adaptor_utils_timer
 from .adaptor_accelerator_npu_accelerator import set_npu_accelerator
 
