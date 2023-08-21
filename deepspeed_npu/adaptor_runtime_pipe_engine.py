@@ -398,15 +398,30 @@ def _exec_send_grads(self, buffer_id):
         self.timers('pipe_send_grad').stop()
 
 
+def _exec_reduce_grads(self):
+    self._force_grad_boundary = True
+    if self.pipeline_enable_backward_allreduce:
+        if self.bfloat16_enabled():
+            if self.zero_optimization_stage() < ZeroStageEnum.gradients:
+                self._bf16_reduce_grads()
+            else:
+                raise NotImplementedError("PP+BF16 only work for ZeRO Stage 1")
+        else:
+            self.allreduce_gradients(bucket_size=MEMORY_OPT_ALLREDUCE_SIZE)
+    self._force_grad_boundary = False
+
+
 engine.PipelineEngine.ID_TO_DTYPE = ID_TO_DTYPE
 engine.PipelineEngine.DTYPE_TO_ID = DTYPE_TO_ID
 engine.PipelineEngine._INSTRUCTION_MAP[schedule.BackwardPass] = _exec_backward_pass
 engine.PipelineEngine._INSTRUCTION_MAP[schedule.RecvActivation] = _exec_recv_activations
 engine.PipelineEngine._INSTRUCTION_MAP[schedule.RecvGrad] = _exec_recv_grads
 engine.PipelineEngine._INSTRUCTION_MAP[schedule.SendGrad] = _exec_send_grads
+engine.PipelineEngine._INSTRUCTION_MAP[schedule.ReduceGrads] = _exec_reduce_grads
 engine.PipelineEngine._exec_backward_pass = _exec_backward_pass
 engine.PipelineEngine._send_tensor_meta = _send_tensor_meta
 engine.PipelineEngine._recv_tensor_meta = _recv_tensor_meta
 engine.PipelineEngine._exec_recv_activations = _exec_recv_activations
 engine.PipelineEngine._exec_recv_grads = _exec_recv_grads
 engine.PipelineEngine._exec_send_grads = _exec_send_grads
+engine.PipelineEngine._exec_reduce_grads = _exec_reduce_grads

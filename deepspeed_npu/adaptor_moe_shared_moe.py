@@ -70,6 +70,10 @@ torch.jit.script = empty_jit_wrapper
 def one_hot_wrapper(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
+        # ASCEND AVOID
+        args = list(args)
+        if args[0].dtype == torch.long:
+            args[0] = args[0].int()
         return fn(*args, **kwargs)
     return wrapper
 
@@ -103,8 +107,7 @@ def top1gating(logits: Tensor,
         logits_w_noise if noisy_gate_policy == 'RSample' else gates,
         dim=1)
     num_experts = int(gates.shape[1])
-    # ASCEND AVOID
-    mask1 = F.one_hot(indices1_s.int(), num_classes=num_experts)
+    mask1 = F.one_hot(indices1_s, num_classes=num_experts)
 
     # mask only used tokens
     if used_token is not None:
