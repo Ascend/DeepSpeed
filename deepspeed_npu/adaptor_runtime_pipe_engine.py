@@ -4,6 +4,8 @@ import torch_npu
 from torch_npu.npu import clear_npu_overflow_flag
 from deepspeed.runtime.pipe.engine import _tensor_bytes
 from deepspeed.runtime.pipe import p2p, engine, schedule
+from deepspeed.runtime.engine import MEMORY_OPT_ALLREDUCE_SIZE
+from deepspeed.runtime.zero.config import ZeroStageEnum
 from deepspeed.runtime.utils import PartitionedTensor
 from . import FLAG_SUPPORT_INF_NAN
 
