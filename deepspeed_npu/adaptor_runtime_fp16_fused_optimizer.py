@@ -238,7 +238,10 @@ def get_combine_weight_norm(self, parameters, norm_type=2, mpu=None):
                                      group=mpu.get_model_parallel_group())
     total_norm = total_norm_npu[0].item()**(1. / norm_type)
 
-    overflow = torch_npu._amp_foreach_non_finite_check_([total_norm_npu])
+    if torch_npu.__version__ >= "2.1":
+        overflow = torch_npu._amp_foreach_non_finite_check([total_norm_npu])
+    else:
+        overflow = torch_npu._amp_foreach_non_finite_check_([total_norm_npu])
 
     if overflow or total_norm == float('inf') or total_norm == -float('inf') or total_norm != total_norm:
         total_norm = -1
