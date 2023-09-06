@@ -29,5 +29,6 @@ from . import adaptor_zero_stage3
 from . import adaptor_zero_mics
 from . import adaptor_utils_timer
 from .adaptor_accelerator_npu_accelerator import set_npu_accelerator
+from . import adaptor_module_inject_replace_module
 
 set_npu_accelerator()
