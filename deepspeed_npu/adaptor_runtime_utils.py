@@ -40,7 +40,10 @@ def check_using_norm(self, norm_group, reduce_overflow=True):
 
 def has_overflow_serial(self, params):
     grads = [p.grad.data for p in params if p.grad is not None]
-    res = torch_npu._amp_foreach_non_finite_check_(grads)
+    if torch_npu.__version__ >= "2.1":
+        res = torch_npu._amp_foreach_non_finite_check(grads)
+    else:
+        res = torch_npu._amp_foreach_non_finite_check_(grads)
     return res
 
 def has_overflow(self, params, has_moe_params=None):

@@ -1,7 +1,10 @@
 import torch
 import torch_npu
 import deepspeed
-from torch_npu.distributed.distributed_c10d import _get_global_rank
+if torch_npu.__version__ >= "2.1":
+    from torch.distributed.distributed_c10d import _get_global_rank
+else:
+    from torch_npu.distributed.distributed_c10d import _get_global_rank
 from deepspeed.utils.groups import _get_data_parallel_group, _get_expert_data_parallel_group
 
 
