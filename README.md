@@ -37,7 +37,7 @@ pip3 install deepspeed==0.9.2
 
 ```bash
 git clone https://gitee.com/ascend/DeepSpeed.git -b v0.9.2 deepspeed_npu
-cd DeepSpeed
+cd deepspeed_npu
 pip3 install .
 ```
 
@@ -52,40 +52,5 @@ import torch_npu
 ...
 ```
 
-### 4.运行单元测试
-
-进入 unit_test 目录，运行各特性的单元测试
-
-fp16:
-
-```bash
-bash test_fp16.sh
-```
-
-Pipeline:
-
-```bash
-bash test_pipeline.sh
-```
-
-ZeRO:
-
-```bash
-bash test_zero.sh
-```
-
-one-bit Adam:
-
-```bash
-bash test_onebit_adam.sh
-```
-
-MoE:
-
-```bash
-bash test_moe.sh
-```
-
-### 5.运行T5模型使用
-
-请参考提供的T5模型[使用指导](./t5/README.md)
+### 3. DeepSpeed 使用参考
+[https://github.com/microsoft/DeepSpeedExamples](https://github.com/microsoft/DeepSpeedExamples)
