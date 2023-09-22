@@ -36,7 +36,7 @@ def complete_grad_norm_calculation_for_cpu_offload(self, params):
 
     overflow_npu = False
     if not FLAG_SUPPORT_INF_NAN:
-        overflow = torch_npu.npu_check_overflow([total_norm_npu])
+        overflow = torch_npu.npu.utils.npu_check_overflow([total_norm_npu])
         overflow_npu = torch.npu.IntTensor([overflow])
         dist.all_reduce(overflow_npu, op=dist.ReduceOp.MAX, group=self.dp_process_group)
         self._model_parallel_all_reduce(tensor=overflow_npu, op=dist.ReduceOp.MAX)
@@ -159,7 +159,7 @@ def get_grad_norm_direct(self, gradients, params, norm_type=2):
 def has_overflow_serial(self, params, is_grad_list=False):
     if not FLAG_SUPPORT_INF_NAN:
         grads = [p.grad.data for p in params if p.grad is not None]
-        return torch_npu.npu_check_overflow(grads)
+        return torch_npu.npu.utils.npu_check_overflow(grads)
 
     for p in params:
         if p.grad is not None and self._has_inf_or_nan(p.grad.data):
@@ -175,7 +175,7 @@ def has_overflow_partitioned_grads_serial(self):
             for j, grad in enumerate(self.averaged_gradients[i]):
                 if grad is not None:
                     grads.append(grad.data)
-        return torch_npu.npu_check_overflow(grads)
+        return torch_npu.npu.utils.npu_check_overflow(grads)
 
     for i in range(len(self.fp16_groups)):
         for j, grad in enumerate(self.averaged_gradients[i]):
