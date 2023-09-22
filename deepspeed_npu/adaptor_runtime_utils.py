@@ -40,7 +40,7 @@ def check_using_norm(self, norm_group, reduce_overflow=True):
 def has_overflow_serial(self, params):
     if not FLAG_SUPPORT_INF_NAN:
         grads = [p.grad.data for p in params if p.grad is not None]
-        return torch_npu._amp_foreach_non_finite_check_(grads)
+        return torch_npu.npu_check_overflow(grads)
 
     for i, p in enumerate(params):
         if p.grad is not None and self._has_inf_or_nan(p.grad.data, i):
@@ -112,7 +112,7 @@ def get_grad_norm(parameters, norm_type=2, mpu=None):
 
     overflow = False
     if not FLAG_SUPPORT_INF_NAN:
-        overflow = torch_npu._amp_foreach_non_finite_check_([total_norm_npu])
+        overflow = torch_npu.npu_check_overflow([total_norm_npu])
         if mpu is not None:
             overflow_npu = torch.npu.IntTensor([overflow])
             dist.all_reduce(overflow_npu, op=dist.ReduceOp.MAX, group=mpu.get_model_parallel_group())
@@ -160,7 +160,7 @@ def get_weight_norm(parameters, norm_type=2, mpu=None):
 
     overflow = False
     if not FLAG_SUPPORT_INF_NAN:
-        overflow = torch_npu._amp_foreach_non_finite_check_([total_norm_npu])
+        overflow = torch_npu.npu_check_overflow([total_norm_npu])
         if mpu is not None:
             overflow_npu = torch.npu.IntTensor([overflow])
             dist.all_reduce(overflow_npu, op=dist.ReduceOp.MAX, group=mpu.get_model_parallel_group())
