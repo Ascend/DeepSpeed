@@ -15,7 +15,7 @@ def backward(self, loss, retain_graph=False):
 def has_overflow_serial(self, params):
     if not FLAG_SUPPORT_INF_NAN:
         grads = [p.grad.data for p in params if p.grad is not None]
-        return torch_npu.npu_check_overflow(grads)
+        return torch_npu.npu.utils.npu_check_overflow(grads)
 
     for p in params:
         if p.grad is not None and self._has_inf_or_nan(p.grad.data):

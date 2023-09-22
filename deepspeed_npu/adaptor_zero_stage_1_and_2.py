@@ -34,7 +34,7 @@ stage_1_and_2.split_half_float_double = split_half_float_double
 
 def update_overflow_tracker_for_param_grad(self, param):
     if not FLAG_SUPPORT_INF_NAN:
-        if param.grad is not None and torch_npu.npu_check_overflow([param.grad.data]):
+        if param.grad is not None and torch_npu.npu.utils.npu_check_overflow([param.grad.data]):
             self.local_overflow = True
     else:
         if param.grad is not None and self._has_inf_or_nan(param.grad.data):
@@ -80,7 +80,7 @@ def complete_grad_norm_calculation_for_cpu_offload(self, params):
 
     overflow_npu = False
     if not FLAG_SUPPORT_INF_NAN:
-        overflow = torch_npu.npu_check_overflow([total_norm_npu])
+        overflow = torch_npu.npu.utils.npu_check_overflow([total_norm_npu])
         overflow_npu = get_accelerator().IntTensor([overflow])
         dist.all_reduce(overflow_npu, op=dist.ReduceOp.MAX, group=self.dp_process_group)
         self._model_parallel_all_reduce(tensor=overflow_npu, op=dist.ReduceOp.MAX)
@@ -139,7 +139,7 @@ def get_grad_norm_direct(self, gradients, params, norm_type=2):
 
     overflow_npu = False
     if not FLAG_SUPPORT_INF_NAN:
-        overflow = torch_npu.npu_check_overflow([total_norm_npu])
+        overflow = torch_npu.npu.utils.npu_check_overflow([total_norm_npu])
         overflow_npu = get_accelerator().IntTensor([overflow])
         dist.all_reduce(overflow_npu, op=dist.ReduceOp.MAX, group=self.dp_process_group)
         self._model_parallel_all_reduce(tensor=overflow_npu, op=dist.ReduceOp.MAX)
@@ -154,7 +154,7 @@ def get_grad_norm_direct(self, gradients, params, norm_type=2):
 def has_overflow_serial(self, params, is_grad_list=False):
     if not FLAG_SUPPORT_INF_NAN:
         grads = [p.grad.data for p in params if p.grad is not None]
-        return torch_npu.npu_check_overflow(grads)
+        return torch_npu.npu.utils.npu_check_overflow(grads)
 
     for p in params:
         if p.grad is not None and self._has_inf_or_nan(p.grad.data):
@@ -170,7 +170,7 @@ def has_overflow_partitioned_grads_serial(self):
             for j, grad in enumerate(self.averaged_gradients[i]):
                 if grad is not None:
                     grads.append(grad.data)
-        return torch_npu.npu_check_overflow(grads)
+        return torch_npu.npu.utils.npu_check_overflow(grads)
 
 
     for i in range(len(self.bit16_groups)):
