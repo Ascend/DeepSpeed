@@ -52,5 +52,10 @@ import torch_npu
 ...
 ```
 
-### 3. DeepSpeed 使用参考
+### 4. DeepSpeed 使用参考
 [https://github.com/microsoft/DeepSpeedExamples](https://github.com/microsoft/DeepSpeedExamples)
+
+### 5. 关于
+
+deepspeed_npu 以 monkey patching 的方式替换 DeepSpeed 原有函数实现。
+在用户层面，并不提供对外接口，用户只需要`import deepspeed_npu`，做到无感迁移原有模型代码。
