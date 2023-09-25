@@ -26,13 +26,13 @@ def sources(self):
 
 def include_paths(self):
     root = os.path.dirname(os.path.abspath(__file__))
-    include_paths = [
+    include_paths_list = [
         os.path.join(root, 'csrc_npu/aio/py_lib'), 
         os.path.join(root, 'csrc_npu/aio/common'), 
         os.path.join(self.ascend_path, 'include'),
         os.path.join(self.torch_npu_path, 'include')
         ]
-    return include_paths
+    return include_paths_list
 
 
 deepspeed.ops.op_builder.async_io.AsyncIOBuilder.ascend_path = ascend_path

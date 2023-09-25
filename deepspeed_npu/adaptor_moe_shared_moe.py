@@ -1,12 +1,13 @@
-from functools import wraps
 import sys
 import torch
 import torch_npu
-import deepspeed
-from torch import Tensor
 import torch.distributed as dist
 import torch.nn.functional as F
-from typing import Any, Tuple, cast, Optional
+import deepspeed
+
+from functools import wraps
+from typing import (Any, Tuple, cast, Optional)
+from torch import Tensor
 from deepspeed.moe import sharded_moe
 from deepspeed.moe.sharded_moe import (gumbel_rsample, _capacity, einsum, exp_selection_uniform_map, _top_idx,
                                        _one_hot_to_float, TUTEL_INSTALLED)
@@ -15,8 +16,9 @@ try:
     # To enable Tutel MoE optimizations:
     #   python3 -m pip install --user --upgrade git+https://github.com/microsoft/tutel@v0.1.x
     from tutel import moe as tutel_moe
+
     TUTEL_INSTALLED = True
-except:
+except ImportError:
     # Fail silently so we don't spam logs unnecessarily if user isn't using tutel
     TUTEL_INSTALLED = False
     pass
@@ -44,25 +46,32 @@ class _AllToAll(torch.autograd.Function):
     def backward(ctx: Any, *grad_output: Tensor) -> Tuple[None, Tensor]:
         return (None, _AllToAll.apply(ctx.group, *grad_output))
 
+
 sharded_moe._ALLToALL = _AllToAll
 for k, v in sys.modules.items():
     if 'deepspeed' in k and hasattr(v, '_AllToAll'):
         setattr(v, '_AllToAll', _AllToAll)
 
+
 def warning_once(fn):
     fn.warned = False
+
     def wrapper(*args, **kwargs):
         if not fn.warned:
             fn.warned = True
-            return fn(*args, **kwargs)
+        return fn(*args, **kwargs)
+
     return wrapper
+
 
 def print_warning():
     print('[warning] torch.jit.script is disabled in this version...')
 
+
 def empty_jit_wrapper(fn):
     print_warning()
     return fn
+
 
 torch.jit.script = empty_jit_wrapper
 
@@ -75,7 +84,9 @@ def one_hot_wrapper(fn):
         if args[0].dtype == torch.long:
             args[0] = args[0].int()
         return fn(*args, **kwargs)
+
     return wrapper
+
 
 torch.nn.functional.one_hot = one_hot_wrapper(torch.nn.functional.one_hot)
 
@@ -87,10 +98,7 @@ def top1gating(logits: Tensor,
                noisy_gate_policy: Optional[str] = None,
                drop_tokens: bool = True,
                use_rts: bool = True,
-               use_tutel: bool = False) -> Tuple[Tensor,
-                                                 Tensor,
-                                                 Tensor,
-                                                 Tensor]:
+               use_tutel: bool = False) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
     """Implements Top1Gating on logits."""
     if noisy_gate_policy == 'RSample':
         logits_w_noise = logits + gumbel_rsample(logits.shape, device=logits.device)
@@ -165,7 +173,7 @@ def top1gating(logits: Tensor,
     if use_tutel:
         gates1_s = (gates * mask1).sum(dim=1)
         locations1_s = torch.sum(locations1 * mask1, dim=1)
-        return l_aux, capacity, num_experts, [indices1_s,], [locations1_s,], [gates1_s,], exp_counts
+        return l_aux, capacity, num_experts, [indices1_s, ], [locations1_s, ], [gates1_s, ], exp_counts
 
     # Store the capacity location for each token
     locations1_s = torch.sum(locations1 * mask1, dim=1)
@@ -180,5 +188,6 @@ def top1gating(logits: Tensor,
     dispatch_mask = combine_weights.bool()
 
     return l_aux, combine_weights, dispatch_mask, exp_counts
+
 
 deepspeed.moe.sharded_moe.top1gating = top1gating

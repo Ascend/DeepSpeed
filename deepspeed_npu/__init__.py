@@ -23,7 +23,6 @@ from . import adaptor_runtime_fp16_unfused_optimizer
 from . import adaptor_runtime_fp16_fused_optimizer
 from . import adaptor_runtime_engine
 from . import adaptor_runtime_utils
-from . import adaptor_zero_partition_parameters
 from . import adaptor_zero_stage_1_and_2
 from . import adaptor_zero_stage3
 from . import adaptor_zero_mics

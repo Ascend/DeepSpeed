@@ -7,7 +7,7 @@ setuptools.setup(
     packages=['deepspeed_npu'],
     install_package_data=True,
     include_package_data=True,
-    install_requires = [
+    install_requires=[
         "deepspeed==0.9.2"
     ],
     entry_points={
