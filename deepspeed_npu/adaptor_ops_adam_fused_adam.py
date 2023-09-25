@@ -6,9 +6,6 @@ from deepspeed.accelerator import get_accelerator
 from deepspeed.ops.adam import FusedAdam
 from deepspeed.ops.op_builder import UtilsBuilder
 
-util_ops = UtilsBuilder().load()
-flatten = util_ops.flatten
-
 
 def FusedAdamInit(self, params, lr=1e-3, bias_correction=True, betas=(0.9, 0.999), eps=1e-8, adam_w_mode=True,
                   weight_decay=0., amsgrad=False, set_grad_none=True):
@@ -23,11 +20,14 @@ def FusedAdamInit(self, params, lr=1e-3, bias_correction=True, betas=(0.9, 0.999
     # Skip buffer
     self._dummy_overflow_buf = get_accelerator().IntTensor([0])
 
+    util_ops = UtilsBuilder().load()
+    self.flatten = util_ops.flatten
 
-def unflatten(flatted_tensor, tensor_list):
-    for buf, flatted in zip(tensor_list, util_ops.unflatten(flatted_tensor, tensor_list)):
-        buf.copy_(flatted)
-    return tensor_list
+    def unflatten(flatted_tensor, tensor_list):
+        for buf, flatted in zip(tensor_list, util_ops.unflatten(flatted_tensor, tensor_list)):
+            buf.copy_(flatted)
+        return tensor_list
+    self.unflatten = unflatten
 
 
 def step(self, closure=None, grads=None, output_params=None, scale=None, grad_norms=None):
@@ -84,15 +84,15 @@ def step(self, closure=None, grads=None, output_params=None, scale=None, grad_no
 
         has_param_to_flatten = True
         if len(g_16) > 0:
-            grad_flat = flatten(g_16)
-            param_flat = flatten(p_16)
-            m_flat = flatten(m_16)
-            v_flat = flatten(v_16)
+            grad_flat = self.flatten(g_16)
+            param_flat = self.flatten(p_16)
+            m_flat = self.flatten(m_16)
+            v_flat = self.flatten(v_16)
         elif len(g_32) > 0:
-            grad_flat = flatten(g_32)
-            param_flat = flatten(p_32)
-            m_flat = flatten(m_32)
-            v_flat = flatten(v_32)
+            grad_flat = self.flatten(g_32)
+            param_flat = self.flatten(p_32)
+            m_flat = self.flatten(m_32)
+            v_flat = self.flatten(v_32)
         else:
             has_param_to_flatten = False
 
@@ -117,13 +117,13 @@ def step(self, closure=None, grads=None, output_params=None, scale=None, grad_no
             )
 
             if len(g_16) > 0:
-                unflatten(param_flat, p_16)
-                unflatten(m_flat, m_16)
-                unflatten(v_flat, v_16)
+                self.unflatten(param_flat, p_16)
+                self.unflatten(m_flat, m_16)
+                self.unflatten(v_flat, v_16)
             if len(g_32) > 0:
-                unflatten(param_flat, p_32)
-                unflatten(m_flat, m_32)
-                unflatten(v_flat, v_32)
+                self.unflatten(param_flat, p_32)
+                self.unflatten(m_flat, m_32)
+                self.unflatten(v_flat, v_32)
 
     return loss
 
