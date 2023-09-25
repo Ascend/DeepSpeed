@@ -8,33 +8,15 @@ import deepspeed
 from deepspeed.accelerator.abstract_accelerator import DeepSpeedAccelerator
 
 
-
-
 class NPU_Accelerator(DeepSpeedAccelerator):
 
     def __init__(self):
         self._name = 'npu'
         self._communication_backend_name = 'hccl'
 
-        # begin initialize for create_op_builder()
-        # put all valid class name <--> class type mapping into class_dict
-        op_builder_dir = self.op_builder_dir()
-        op_builder_module = importlib.import_module(op_builder_dir)
-        for _, module_name, _ in pkgutil.iter_modules([os.path.dirname(op_builder_module.__file__)]):
-            # avoid self references
-            if module_name != 'all_ops' and module_name != 'builder':
-                module = importlib.import_module("{}.{}".format(op_builder_dir, module_name))
-                for member_name in module.__dir__():
-                    if member_name.endswith(
-                            'Builder'
-                    ) and member_name != "OpBuilder" and member_name != "CUDAOpBuilder" and member_name != "TorchCPUOpBuilder":  # avoid abstract classes
-                        if not member_name in self.class_dict:
-                            self.class_dict[member_name] = getattr(module, member_name)
-        # end initialize for create_op_builder()
-
     # Device APIs
     def device_name(self, device_index=None):
-        if device_index == None:
+        if device_index is None:
             return 'npu'
         return 'npu:{}'.format(device_index)
 

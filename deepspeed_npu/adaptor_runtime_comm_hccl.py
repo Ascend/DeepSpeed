@@ -1,12 +1,8 @@
-'''
-Copyright 2020 The Microsoft DeepSpeed Team
-'''
-
+import time
+import numpy as np
 import torch
 import torch_npu
 import torch.distributed as dist
-import time
-import numpy as np
 
 
 class HcclBackend(object):
@@ -87,8 +83,9 @@ class HcclBackend(object):
         # Allgather for scale
         dist.all_gather(recvbuf_scale, worker_scale, group=self.world_group)
 
-        compensated_server_m = torch_npu.npu_sign_bits_unpack(recvbuf_sign.type(torch.uint8).flatten(), self.size, torch.float32).mul_(
-                    torch.stack(recvbuf_scale).mul_(1 / self.size)).sum(0)
+        compensated_server_m = torch_npu.npu_sign_bits_unpack(
+            recvbuf_sign.type(torch.uint8).flatten(), self.size, torch.float32).mul_(
+            torch.stack(recvbuf_scale).mul_(1 / self.size)).sum(0)
 
         compensated_server_m.add_(server_error)
         server_scale = torch.norm(compensated_server_m) / np.sqrt(
@@ -133,8 +130,8 @@ class HcclBackend(object):
         recvbuf_sign_server = torch.stack(recvbuf_sign_server)
 
         buffer_m.data.copy_(
-                torch_npu.npu_sign_bits_unpack(recvbuf_sign_server.type(torch.uint8).flatten(), self.size, torch.float32)
-                  .mul_(recvbuf_scale_server_tmp).flatten().data)
+            torch_npu.npu_sign_bits_unpack(recvbuf_sign_server.type(torch.uint8).flatten(), self.size, torch.float32)
+            .mul_(recvbuf_scale_server_tmp).flatten().data)
 
         if original_size != worker_error_size:
             buffer_m = buffer_m[0:original_size]

@@ -2,6 +2,7 @@
 
 from deepspeed.launcher.runner import main
 
+
 def deepspeed_npu_main():
-    import deepspeed_npu # noqa
+    import deepspeed_npu  # noqa
     main()

@@ -2,6 +2,7 @@ import torch
 from torch import Tensor
 from deepspeed.runtime.comm import coalesced_collectives
 
+
 def torch_reduce_scatter_fn(input_tensor: Tensor, output_tensor: Tensor, group):
     input_tensor_lst = list(
         torch.chunk(input_tensor,
@@ -15,5 +16,6 @@ def torch_reduce_scatter_fn(input_tensor: Tensor, output_tensor: Tensor, group):
         group=group,
     )
     output_tensor.copy_(new_output_tensor)
+
 
 coalesced_collectives.torch_reduce_scatter_fn = torch_reduce_scatter_fn

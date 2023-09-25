@@ -1,7 +1,5 @@
 import torch
-import hashlib
 import deepspeed
-from deepspeed import comm as dist
 from deepspeed.utils import logger
 from deepspeed.runtime.config import (ADAGRAD_OPTIMIZER, ADAM_OPTIMIZER, ADAMW_OPTIMIZER, LAMB_OPTIMIZER,
     ONEBIT_ADAM_OPTIMIZER, ONEBIT_LAMB_OPTIMIZER, TORCH_ADAM_PARAM, ADAM_W_MODE, ADAM_W_MODE_DEFAULT,
