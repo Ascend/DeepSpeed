@@ -8,6 +8,7 @@ from deepspeed.checkpoint.constants import OPTIMIZER_STATE_DICT
 from deepspeed.utils import logger
 from apex.contrib.combine_tensors import combine_npu
 from deepspeed_npu.adaptor_ops_adam_fused_adam import FusedAdamNPU
+from . import FLAG_SUPPORT_INF_NAN
 
 
 # fused_optimizer============
@@ -127,7 +128,8 @@ def initialize_optimizer_states(self):
 
 
 def Fp16OptimizerBackward(self, loss, create_graph=False, retain_graph=False):
-    torch.npu.clear_npu_overflow_flag()
+    if not FLAG_SUPPORT_INF_NAN:
+        torch.npu.clear_npu_overflow_flag()
     scaled_loss = (loss.float()) * self.cur_scale
     scaled_loss.backward(create_graph=create_graph, retain_graph=retain_graph)
 
@@ -238,10 +240,9 @@ def get_combine_weight_norm(self, parameters, norm_type=2, mpu=None):
                                      group=mpu.get_model_parallel_group())
     total_norm = total_norm_npu[0].item()**(1. / norm_type)
 
-    if torch_npu.__version__ >= "2.1":
-        overflow = torch_npu._amp_foreach_non_finite_check([total_norm_npu])
-    else:
-        overflow = torch_npu._amp_foreach_non_finite_check_([total_norm_npu])
+    overflow = False
+    if not FLAG_SUPPORT_INF_NAN:
+        overflow = torch_npu.npu.utils.npu_check_overflow([total_norm_npu])
 
     if overflow or total_norm == float('inf') or total_norm == -float('inf') or total_norm != total_norm:
         total_norm = -1

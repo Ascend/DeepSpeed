@@ -7,6 +7,7 @@ from torch.cuda import _lazy_call, device as device_ctx_manager
 from deepspeed.runtime.activation_checkpointing.checkpointing import gather_partitioned_activations, detach_variable, \
     merge_tensors, get_cuda_rng_tracker, is_activation_to_checkpoint, extract_tensors
 from deepspeed.runtime.utils import copy_to_device, move_to_device, see_memory_usage, bwc_tensor_model_parallel_rank
+from . import FLAG_SUPPORT_INF_NAN
 
 CKPT_INIT_FLAG = False
 CKPT_OVERFLOW_FLAG = False
@@ -78,19 +79,19 @@ def backward(ctx, *grads):
 
         see_memory_usage("In backward checkpointing code before forward", force=False)
 
-        global CKPT_INIT_FLAG, CKPT_OVERFLOW_FLAG, CKPT_CONST_VAR
-        if not CKPT_INIT_FLAG:
-            CKPT_INIT_FLAG = True
-            CKPT_CONST_VAR = torch.tensor([65504.], dtype=torch.float16).npu()
+        if not FLAG_SUPPORT_INF_NAN:
+            global CKPT_INIT_FLAG, CKPT_OVERFLOW_FLAG, CKPT_CONST_VAR
+            if not CKPT_INIT_FLAG:
+                CKPT_INIT_FLAG = True
+                CKPT_CONST_VAR = torch.tensor([65504.], dtype=torch.float16).npu()
 
-        CKPT_OVERFLOW_FLAG = torch_npu.npu.get_npu_overflow_flag()
-        with torch.enable_grad():
-
-            outputs = ctx.run_function(*detached_inputs)
-            torch.npu.clear_npu_overflow_flag()
-
-
-
+            CKPT_OVERFLOW_FLAG = torch_npu.npu.get_npu_overflow_flag()
+            with torch.enable_grad():
+                outputs = ctx.run_function(*detached_inputs)
+                torch.npu.clear_npu_overflow_flag()
+        else:
+            with torch.enable_grad():
+                outputs = ctx.run_function(*detached_inputs)
 
         see_memory_usage("In backward checkpointing code after forward", force=False)
         # Set the states back to what it was at the start of this function.
@@ -137,9 +138,10 @@ def backward(ctx, *grads):
             else:
                 ret_list.append(None)
 
-        temp = torch_npu.npu.get_npu_overflow_flag()
-        CKPT_OVERFLOW_FLAG = CKPT_OVERFLOW_FLAG or temp
-        CKPT_CONST_VAR + CKPT_OVERFLOW_FLAG * 10000
+        if not FLAG_SUPPORT_INF_NAN:
+            temp = torch_npu.npu.get_npu_overflow_flag()
+            CKPT_OVERFLOW_FLAG = CKPT_OVERFLOW_FLAG or temp
+            CKPT_CONST_VAR + CKPT_OVERFLOW_FLAG * 10000
 
     return tuple(ret_list)
 
