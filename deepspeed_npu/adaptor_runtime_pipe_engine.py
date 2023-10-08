@@ -353,7 +353,6 @@ def _exec_send_grads(self, buffer_id):
             first_input = inputs[0]
             assert all([torch.is_tensor(elt) for elt in inputs[1:]])
             # inputs_grad_tail = [elt.grad for elt in inputs[1:] if elt.grad is not None]
-            # DeepSpeed bug? PR https://github.com/microsoft/DeepSpeed/pull/2538
             inputs_grad_tail = [elt.grad for elt in inputs[1:]]
         elif torch.is_tensor(inputs):
             first_input = inputs

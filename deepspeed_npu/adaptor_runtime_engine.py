@@ -13,7 +13,7 @@ def _configure_basic_optimizer(self, model_parameters):
     # print(optimizer_parameters.keys())
     if "max_grad_norm" in optimizer_parameters.keys():
         raise ValueError(
-            "'max_grad_norm' is not supported as an optimizer parameter, please switch to using the deepspeed parameter 'gradient_clipping' see: https://www.deepspeed.ai/docs/config-json/#gradient-clipping for more details"
+            "'max_grad_norm' is not supported as an optimizer parameter, please switch to using the deepspeed parameter 'gradient_clipping'"
         )
 
     if self.optimizer_name() in [ADAM_OPTIMIZER, ADAMW_OPTIMIZER]:

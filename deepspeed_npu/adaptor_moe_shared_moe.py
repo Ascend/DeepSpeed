@@ -14,7 +14,6 @@ from deepspeed.moe.sharded_moe import (gumbel_rsample, _capacity, einsum, exp_se
 
 try:
     # To enable Tutel MoE optimizations:
-    #   python3 -m pip install --user --upgrade git+https://github.com/microsoft/tutel@v0.1.x
     from tutel import moe as tutel_moe
 
     TUTEL_INSTALLED = True

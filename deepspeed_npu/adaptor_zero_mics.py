@@ -27,7 +27,7 @@ def allreduce_mics_shard_grads(self, params, partitioned_grads_buffers: List[Ten
         raise RuntimeError("Local sharding has no support for CPU offloading")
 
     # manually coalescing all-reduce
-    # to work around HCCL limitation https://gitee.com/ascend/pytorch/issues/I7I7YL
+    # to work around HCCL limitation
     aggregated_buffer: Tensor = torch.cat(partitioned_grads_buffers)
     aggregated_buffer.div_(param_repli_size)
     dist.all_reduce(aggregated_buffer, group=param_repli_group)
