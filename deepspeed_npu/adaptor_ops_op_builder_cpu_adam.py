@@ -23,9 +23,12 @@ def extra_ldflags(self):
 
 
 def cxx_args(self):
-    return ['-O3', '-std=c++14', '-g', '-Wno-reorder', '-fopenmp',
+    args = ['-O3', '-std=c++14', '-g', '-Wno-reorder', '-fopenmp',
             '-L' + os.path.join(self.ascend_path, 'lib64'),
             '-L' + os.path.join(self.torch_npu_path, 'lib')]
+    args += ['-fstack-protector-all', '-Wl,-z,relro,-z,now,-z,noexecstack',
+             '-fPIC -pie', '-Wl,--disable-new-dtags,--rpath']
+    return args
 
 
 def nvcc_args(self):
