@@ -20,7 +20,7 @@ typedef c10::Half __half;
 
 class Adam_Optimizer {
 public:
-    Adam_Optimizer(
+    explicit Adam_Optimizer(
         float alpha = 1e-3,
         float betta1 = 0.9,
         float betta2 = 0.999,

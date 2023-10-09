@@ -7,6 +7,7 @@
 Functionality for swapping optimizer tensors to/from (NVMe) storage devices.
 */
 #include "deepspeed_aio_thread.h"
+#include "torch_npu/csrc/aten/NPUNativeFunctions.h"
 
 using namespace std;
 

@@ -45,7 +45,7 @@ pip3 install .
 
 ##### 2.3.1 权限相关说明
 
-  - 运行程序前，建议用户对训练所需文件做好权限控制等安全措施，请勿使用管理员账户安装运行，文件夹以及文件权限建议设置为 550。
+  - 运行程序前，建议用户对训练所需文件做好权限控制等安全措施，请勿使用管理员账户安装运行，文件夹权限建议设置为 750，文件权限建议设置为 640。
   - 在多用户共享数据集的场景下，请根据需求最小化权限设置所需的文件夹以及文件的读写权限等，避免出现非法访问等安全问题。
   - 对于涉及隐私数据、商业资产等敏感文件，建议用户做好安全防护和权限控制，避免隐私泄露造成安全风险。
   - 对于涉及到使用 C++ 动态编译特性的场景，建议打开 ASLR （地址空间配置随机加载）以及对编译后的 SO 文件开启 strip（移除调试符号信息），减少程序的暴露面。 因编译由 DeepSpeed 原生框架负责且无此类配置选项，故需用户自行开启，开启方法参考下方章节。
@@ -97,8 +97,6 @@ deepspeed_npu 以 **monkey patching/装饰器**等方式**替换/修改** DeepSp
 | deepspeed.moe.sharded_moe.top1gating                                                                       | moe top1 获取函数                   |
 | deepspeed.ops.adam.FusedAdam.__init__                                                                      | 融合优化器初始化函数                      |
 | deepspeed.ops.adam.FusedAdam.step                                                                          | 融合优化器权重更新函数                     |
-| deepspeed.ops.op_builder.async_io.AsyncIOBuilder.ascend_path                                               | CANN 路径获取函数                     |
-| deepspeed.ops.op_builder.async_io.AsyncIOBuilder.torch_npu_path                                            | torch npu 路径获取函数                |
 | deepspeed.ops.op_builder.async_io.AsyncIOBuilder.sources                                                   | AsyncIOBuilder 源文件路径获取函数        |
 | deepspeed.ops.op_builder.async_io.AsyncIOBuilder.include_paths                                             | AsyncIOBuilder include 文件路径获取函数 |
 | deepspeed.ops.op_builder.builder.assert_no_cuda_mismatch                                                   | cuda 版本检查函数                     |
