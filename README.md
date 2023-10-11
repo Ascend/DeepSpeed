@@ -84,7 +84,11 @@ import torch_npu
 - `deepspeed_npu`：文件夹下的各个文件都对应原生的文件，如 adaptor_xxx_yyy.py 文件对应原生的 xxx.yyy.py 文件。
 - `deepspeed_npu.csrc_npu`：文件夹下为相关特性的动态编译 C++ 文件，与原生的 csrc 文件夹相对应。如 csrc_npu/adam 文件夹对应原生的 csrc/adam 文件夹。
 
-#### 5.2 接口替换
+#### 5.2 通信矩阵说明
+
+本插件不涉及端口侦听等相关行为，相关端口由用户在模型脚本指定调用原生接口开启，建议用户注意做好安全防护，单机训练的情况下请勿绑定全局端口。
+
+#### 5.3 接口替换说明
 
 deepspeed_npu 以 **monkey patching/装饰器**等方式**替换/修改** DeepSpeed 原有函数实现，并不提供对外接口，用户只需要`import deepspeed_npu`，做到无感迁移原有模型代码。
 
