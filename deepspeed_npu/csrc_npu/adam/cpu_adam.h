@@ -39,8 +39,11 @@ public:
         _buf_index(false),
         _adamw_mode(adamw_mode)
     {
-        aclrtMallocHost((void**)_doubled_buffer, TILE * sizeof(__half));
-        aclrtMallocHost((void**)(_doubled_buffer + 1), TILE * sizeof(__half));
+        int res1 = aclrtMallocHost((void**)_doubled_buffer, TILE * sizeof(__half));
+        int res2 = aclrtMallocHost((void**)(_doubled_buffer + 1), TILE * sizeof(__half));
+        if(res1 != 0 || res2 != 0){
+            throw std::runtime_error("Malloc host memory error.");
+        }
     }
 
     ~Adam_Optimizer()
