@@ -27,7 +27,7 @@ pip3 install deepspeed==0.6.0
 2.然后安装deepspeed-npu插件
 
 ```
-git clone https://gitee.com/ascend/DeepSpeed.git
+git clone https://gitee.com/ascend/DeepSpeed.git -b v0.6.0
 cd DeepSpeed
 pip3 install ./
 ```
