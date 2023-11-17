@@ -41,9 +41,17 @@ cd deepspeed_npu
 pip3 install .
 ```
 
-#### 2.3 安全加固（可选）
+#### 2.3 卸载方法
 
-##### 2.3.1 权限相关说明
+作为 Python 包，deepspeed_npu 与其他 python 包一样，可通过 pip 命令卸载：
+
+```shell
+pip uninstall deepspeed_npu
+```
+
+#### 2.4 安全加固（可选）
+
+##### 2.4.1 权限相关说明
 
   - Linux 系统的 umask 值建议不低于 027。
   - 不建议使用管理员账户安装运行，建议安装完成后对安装目录文件做好权限管控，文件及文件夹权限建议设置为 550。
@@ -53,22 +61,14 @@ pip3 install .
   - 原生框架中，在使用某些特定特性时，可能会在`~/.cache`文件夹下生成临时文件，建议用户也应对`~/.cache`文件夹做好权限控制，避免安全风险。
   - 对于涉及到使用 C++ 动态编译特性的场景，建议打开 ASLR （地址空间配置随机加载）以及对编译后的 SO 文件开启 strip（移除调试符号信息），减少程序的暴露面。 因编译由 DeepSpeed 原生框架负责且无此类配置选项，故需用户自行开启，开启方法参考下方章节。
 
-##### 2.3.2 打开 ASLR
+##### 2.4.2 打开 ASLR
 ```shell
 echo 2 > /proc/sys/kernel/randomize_va_space
 ```
 
-##### 2.3.3 对 cpu_adam、offload 等特性动态编译的 so 文件开启 strip，具体路径根据实际情况修改
+##### 2.4.3 对 cpu_adam、offload 等特性动态编译的 so 文件开启 strip，具体路径根据实际情况修改
 ```shell
 strip -s /<PATH>/<FEATURE>.so
-```
-
-### 2.4 卸载方法
-
-作为 Python 包，deepspeed_npu 与其他 python 包一样，可通过 pip 命令卸载：
-
-```shell
-pip uninstall deepspeed_npu
 ```
 
 ### 3.插件使用方法
@@ -76,10 +76,11 @@ pip uninstall deepspeed_npu
 在模型启动文件中 import deepspeed_npu，并配合 deepspeed / torch 使用,例如
 
 ```python
-import deepspeed_npu
+
 import torch
 import torch_npu
-
+import deepspeed
+import deepspeed_npu
 ...
 ```
 
